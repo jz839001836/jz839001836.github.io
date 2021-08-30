@@ -17,7 +17,7 @@
 <meta property="og:locale">
 <meta property="og:image" content="http://example.com/images/work_queue.PNG">
 <meta property="article:published_time" content="2021-08-29T08:12:26.000Z">
-<meta property="article:modified_time" content="2021-08-29T15:16:04.415Z">
+<meta property="article:modified_time" content="2021-08-30T15:13:22.228Z">
 <meta property="article:author" content="AZheng">
 <meta property="article:tag" content="线程">
 <meta property="article:tag" content="APUE">
@@ -205,6 +205,48 @@
 <h1 id="线程创建"><a href="#线程创建" class="headerlink" title="线程创建"></a>线程创建</h1><p>在创建多个控制线程之前，程序的行为与传统进程并无区别。新增线程可以通过调用pthread_create函数创建。</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_create</span><span class="params">( <span class="keyword">pthread_t</span> *<span class="keyword">restrict</span> tidp, </span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">void</span> *(*start_rtn)(<span class="keyword">void</span> *), </span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">void</span> *<span class="keyword">restrict</span> arg)</span></span>;</span><br><span class="line">								返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
 
+<p>当pthread_create成功返回时，新创建的线程ID设置在tidp指向的内存单元。attr参数用于定制不同的线程属性（为NULL时，创建一个具有默认属性的线程）。</p>
+<p>新创建的线程从start_rtn函数的地址开始运行，arg是该函数的参数。如果要向start_rtn函数传递一个以上的参数，则可以将参数放入一个结构中，然后把这个结构的地址作为arg参数传入。</p>
+<p>线程创建时不能保证哪个线程会先运行，新创建的线程可以访问进程的地址空间，并且继承调用线程的浮点环境和信号屏蔽字，但是该线程的挂起信号集会被清除。</p>
+<p>注意，pthread函数在调用失败会返回错误码，因为每个线程都提供errno副本，这样就可以与使用errno的函数兼容。</p>
+<p>注意，在pthread_create函数返回之前新线程就可能开始执行。</p>
+<details>
+    <summary>>打印线程ID</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+pthread_t ntid;
+void printids(const char *s)
+&#123;
+    pid_t       pid;
+    pthread_t   tid;
+    pid = getpid();
+    tid = pthread_self();
+    printf("%s pid %lu tid %lu (0x%lx)\n", s, (unsigned long)pid, (unsigned long)tid, (unsigned long)tid);
+&#125;
+void *thr_fn(void *arg)
+&#123;
+    printids("new thread: ");
+    return ((void *)0);
+&#125;
+int main(void)
+&#123;
+    int err;
+    err = pthread_create(&ntid, NULL, thr_fn, NULL);
+    if (err != 0)
+        err_exit(err, "can't create thread");
+    printids("main thread: ");
+    sleep(1);
+    exit(0);
+&#125;
+在Linux下运行结果是：
+main thread:  pid 3037 tid 140295829989184 (0x7f992b1c2740)
+new thread:  pid 3037 tid 140295829985024 (0x7f992b1c1700)
+可以看到，两个线程的进程ID均为3037，两个线程ID不同。
+</code></pre>
+</details>
+
+
+<h1 id="线程终止"><a href="#线程终止" class="headerlink" title="线程终止"></a>线程终止</h1><p>如果进程中的任一线程调用了exit、_Exit、_exit，那么整个进程都会终止。与此类似，如果默认的动作（信号）是终止进程，那么发送到线程的信号会终止整个进程。</p>
 
       
 
@@ -322,6 +364,20 @@
 </article>
 
   
+<nav id="article-nav">
+  
+    <a href="/2021/08/30/Markdown%E4%B8%AD%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98/" id="article-nav-newer" class="article-nav-link-wrap">
+      <i class="icon-circle-left"></i>
+      <div class="article-nav-title">
+        
+          使用Markdown中我遇到的问题
+        
+      </div>
+    </a>
+  
+  
+</nav>
+
 
 <aside class="wrap-side-operation">
     <div class="mod-side-operation">
@@ -447,6 +503,10 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
              
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color5">APUE</a>
+              </li>
+             
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color4">Markdown</a>
               </li>
             
             <div class="clearfix"></div>
