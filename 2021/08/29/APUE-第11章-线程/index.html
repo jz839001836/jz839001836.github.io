@@ -16,8 +16,11 @@
 <meta property="og:description" content="线程概念在程序设计时把进程设计成某个时刻，每个线程能够处理各自独立的任务。这有很多好处：  为每种事件类型分配单独的处理线程，可以简化处理异步事件的代码； 多个进程必须使用操作系统提供的复杂机制才能实现内存和文件描述符的共享，而多个线程自动地可以访问相同的存储地址空间和文件描述符； 分解问题从而提高整个程序的吞吐量。若是单线程进程要完成多个任务，需要把任务串行化；若是进程控制多个线程，相互独立的任">
 <meta property="og:locale">
 <meta property="og:image" content="http://example.com/images/work_queue.PNG">
+<meta property="og:image" content="http://example.com/images/two_threads_Interleave.PNG">
+<meta property="og:image" content="http://example.com/images/two_threads_synchronize.PNG">
+<meta property="og:image" content="http://example.com/images/two_threads_increment_same_variable.PNG">
 <meta property="article:published_time" content="2021-08-29T08:12:26.000Z">
-<meta property="article:modified_time" content="2021-08-31T14:09:56.642Z">
+<meta property="article:modified_time" content="2021-09-04T15:22:04.396Z">
 <meta property="article:author" content="AZheng">
 <meta property="article:tag" content="线程">
 <meta property="article:tag" content="APUE">
@@ -197,11 +200,13 @@
 <p>FreeBSD 8.0和Mac OS X 10.6.8用一个指向pthread结构的指针表示pthread_t。</p>
 </blockquote>
 <p>线程可以通过pthread_self函数获取自身线程ID。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">pthread_t</span> <span class="title">pthread_selt</span><span class="params">(<span class="keyword">void</span>)</span></span>;</span><br><span class="line">								返回值：调用线程的线程ID</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">pthread_t</span> <span class="title">pthread_self</span><span class="params">(<span class="keyword">void</span>)</span></span>;</span><br><span class="line">								返回值：调用线程的线程ID</span><br></pre></td></tr></table></figure>
 
 <p>当线程需要识别以线程ID为标识的数据结构时，pthread_self函数和pthread_equal可以一起使用。如：</p>
 <p>下图为<strong>主线程控制工作队列</strong>实例。可以看到，主线程可以将新作业放进工作队列中，另外3个线程组成的线程池从队列中移出作业，当然线程不能任意从队列顶端取出作业，而是<strong>由主线程控制作业分配</strong>，主线程会在每个待处理作业的结构中标志处理该作业的线程ID，<strong>每个工作线程</strong>只能<strong>移除有自己线程ID的作业</strong>。</p>
 <p><img src="/images/work_queue.PNG" alt="工作队列实例"></p>
+<span id="more"></span>
+
 <h1 id="线程创建"><a href="#线程创建" class="headerlink" title="线程创建"></a>线程创建</h1><p>在创建多个控制线程之前，程序的行为与传统进程并无区别。新增线程可以通过调用pthread_create函数创建。</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_create</span><span class="params">( <span class="keyword">pthread_t</span> *<span class="keyword">restrict</span> tidp, </span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">void</span> *(*start_rtn)(<span class="keyword">void</span> *), </span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">void</span> *<span class="keyword">restrict</span> arg)</span></span>;</span><br><span class="line">								返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
 
@@ -253,6 +258,364 @@ new thread:  pid 3037 tid 140295829985024 (0x7f992b1c1700)
 <li>线程可以被同一进程中的其他进程取消</li>
 <li>线程调用pthread_exit</li>
 </ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">pthread_exit</span><span class="params">(<span class="keyword">void</span> *rval_ptr)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>rval_ptr是一个无类型指针，与传给启动例程的单个参数类似。进程中的其他线程也可以通过调用pthread_join函数访问该指针。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_join</span><span class="params">(<span class="keyword">pthread_t</span> thread, <span class="keyword">void</span> **rval_ptr)</span></span>;</span><br><span class="line">								返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>该函数调用线程将一直阻塞，直到指定的线程调用pthread_exit、从启动例程中返回或被取消。如果线程简单地从它的启动例程返回，rval_ptr就包含返回码。如果线程被取消，有rval_ptr指定的内存单元就设置为PTHREAD_CANCELED。</p>
+<p>通过调用pthread_join自动把线程置于分离状态，资源就可以恢复。如果线程已经处于分离状态，pthread_join调用就会失败，返回EINVAL。</p>
+<p>如果对线程的返回值不感兴趣，那么可以把rval_ptr设置为NULL。在这种情况下，调用pthread_join函数可以等待指定线程的终止，但不获取指定线程的终止状态。</p>
+<details>
+    <summary>>  获得线程退出状态</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+void *
+thr_fn1(void *arg)
+&#123;
+    printf("thread 1 returning\n");
+    return ((void *)1);                //退出方式1：直接返回
+&#125;
+&nbsp
+void *
+thr_fn2(void *arg)
+&#123;
+    printf("thread 2 exiting\n");
+    pthread_exit((void *)2);        //退出方式2：调用pthread_exit()函数
+&#125;
+&nbsp
+int 
+main(void)
+&#123;
+    int         err;
+    pthread_t   tid1, tid2;
+    void        *tret;
+    err = pthread_create(&tid1, NULL, thr_fn1, NULL);
+    if (err != 0)
+        err_exit(err, "can't create thread 1");
+    err = pthread_create(&tid2, NULL, thr_fn2, NULL);
+    if (err != 0)
+        err_exit(err, "can't create thread 2");
+    err = pthread_join(tid1, &tret);
+    if (err != 0)
+        err_exit(err, "can't join with thread 1");
+    printf("thread 1 exit code %ld\n", (long)tret);
+    err = pthread_join(tid2, &tret);
+    if (err != 0)
+        err_exit(err, "can't join with thread 2");
+    printf("thread 2 exit code %ld\n", (long)tret);
+    exit(0);
+&#125;
+Linux中运行结果：
+thread 2 exiting
+thread 1 returning
+thread 1 exit code 1
+thread 2 exit code 2
+</code></pre>
+</details>
+
+
+<p>可以看到，当一个线程（此处为主线程）通过调用pthread_exit退出或简单地从启动例程中返回时，进程中的其他线程可以通过调用pthread_join函数获得该线程的退出状态。</p>
+<h2 id="内存覆写"><a href="#内存覆写" class="headerlink" title="内存覆写"></a>内存覆写</h2><p>如果线程在自己的栈上分配了一个结构，然后把指向这个结构的指针传给pthread_exit，那么调用pthread_join的线程（下面的代码中是主线程）试图使用这个结构，这个栈有可能已经被撤销，这块内存已被另作他用。</p>
+<details>
+    <summary>> pthread_exit的参数不正确使用</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+&nbsp
+struct foo &#123;
+    int a, b, c, d;
+&#125;;
+&nbsp
+void 
+printfoo(const char *s, const struct foo *fp)
+&#123;
+    printf("%s", s);
+    printf(" structure at 0x%lx\n", (unsigned long)fp);
+    printf(" foo.a = %d\n", fp->a);
+    printf(" foo.b = %d\n", fp->b);
+    printf(" foo.c = %d\n", fp->c);
+    printf(" foo.d = %d\n", fp->d);
+&#125;
+&nbsp
+void *
+thr_fn1(void *arg)
+&#123;
+    struct foo  foo = &#123;1, 2, 3, 4&#125;;
+&nbsp
+    printfoo("thread 1: \n", &foo);
+    pthread_exit((void *)&foo);
+&#125;
+&nbsp
+void *
+thr_fn2(void *arg)
+&#123;
+    printf("thread 2: ID is %lu\n", (unsigned long)pthread_self());
+    pthread_exit((void *)0);
+&#125;
+&nbsp
+int
+main(void)
+&#123;
+    int         err;
+    pthread_t   tid1, tid2;
+    struct foo  *fp;
+    &nbsp
+    err = pthread_create(&tid1, NULL, thr_fn1, NULL);
+    if (err != 0)
+        err_exit(err, "can't create thread 1");
+    err = pthread_join(tid1, (void *)&fp);
+    if (err != 0)
+        err_exit(err, "can't join with thread 1");
+    sleep(1);
+    printf("parent starting second thread\n");
+    err = pthread_create(&tid2, NULL, thr_fn2, NULL);
+    if (err != 0)
+        err_exit(err, "can't create thread 2");
+    sleep(1);
+    printfoo("parent:\n", fp);
+    exit(0);
+&#125;
+&nbsp
+Linux中的结果是：
+thread 1: 
+ structure at 0x7fbadc518ed0
+ foo.a = 1
+ foo.b = 2
+ foo.c = 3
+ foo.d = 4
+parent starting second thread
+thread 2: ID is 140440536979200
+parent:
+ structure at 0x7fbadc518ed0
+ foo.a = 0
+ foo.b = 0
+ foo.c = -330136658
+ foo.d = 32766
+&nbsp
+可以看到，在调用thread2线程后，fp所指向的内存单元已经被改写。
+</pre></code>
+</details>
+## 线程清理
+
+<p>线程可以通过调用pthread_cancel函数请求取消同一进程中的其他线程。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_cancel</span><span class="params">(<span class="keyword">pthread_t</span> tid)</span></span>;</span><br><span class="line">								返回值：若成功，则返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>默认情况下，pthread_cancel函数会使tid表示的线程表现为调用了PTHREAD_CANCELED的pthread_exit函数。但是tid指示的线程可以选择忽略或者其他方式控制它被取消的方式。注意pthread_cancel并不等待线程终止，它仅仅是提出请求。</p>
+<p>线程可以安排它退出时需要调用的函数，这与进程在退出时使用atexit函数（第7.3节）安排退出类似。这样的函数称为**线程清理处理程序(thread cleanup handler)**。一个线程可以建立多个清理处理程序，处理程序记录在栈中，也就是说，它们执行的顺序与它们注册时相反。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">pthread_cleanup_push</span><span class="params">(<span class="keyword">void</span> (*rtn)(<span class="keyword">void</span> *), <span class="keyword">void</span> *arg)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">pthread_cleanup_pop</span><span class="params">(<span class="keyword">int</span> execute)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>当（退出）线程执行以下动作时，清理函数rtn由pthread_cleanup_push函数调度，调用时只有一个arg参数：</p>
+<ul>
+<li>调用pthread_exit</li>
+<li>响应取消请求（pthread_cancel）</li>
+<li>用非零execute参数调用pthread_cleanup_pop</li>
+</ul>
+<p>如果execute参数为0，则清理函数不被调用。不管发生是上述那种情况，pthread_cleanup_pop都将删除上次pthread_cleanup_push调用建立的清理处理程序。</p>
+<details>
+    <summary>> 线程清理程序</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+&nbsp
+void cleanup(void *arg)
+&#123;
+    printf("cleanup: %s\n", (char *)arg);
+&#125;
+&nbsp
+void *
+thr_fn1(void *arg)
+&#123;
+    printf("thread 1 start\n");
+    pthread_cleanup_push(cleanup, "thread 1 first handler");
+    pthread_cleanup_push(cleanup, "thread 1 second handler");
+    printf("thread 1 push complete\n");
+    if (arg)
+        return ((void *)1);
+    pthread_cleanup_pop(0);
+    pthread_cleanup_pop(0);
+    return ((void *)1);
+&#125;
+&nbsp
+void *
+thr_fn2(void *arg)
+&#123;
+    printf("thread 2 start\n");
+    pthread_cleanup_push(cleanup, "thread 2 first handler");
+    pthread_cleanup_push(cleanup, "thread 2 second handler");
+    printf("thread 2 push complete\n");
+    if (arg)
+        pthread_exit((void *)2);
+    pthread_cleanup_pop(0);
+    pthread_cleanup_pop(0);
+    pthread_exit((void *)2);
+&#125;
+nbsp
+int 
+main(void)
+&#123;
+    int         err;
+    pthread_t   tid1, tid2;
+    void        *tret;
+&nbsp
+    err = pthread_create(&tid1, NULL, thr_fn1, (void *)1);
+    if (err != 0)
+        err_exit(err, "can't create thread 1");
+    err = pthread_create(&tid2, NULL, thr_fn2, (void *)1);
+    if (err != 0)
+        err_exit(err, "can't create thread 2");
+&nbsp
+    err = pthread_join(tid1, &tret);
+    if (err != 0)
+        err_exit(err, "can't join with thread 1");
+    printf("thread 1 exit code %ld\n", (long)tret);
+&nbsp
+    err = pthread_join(tid2, &tret);
+    if (err != 0)
+        err_exit(err, "can't join with thread 2");
+    printf("thread 2 exit code %ld\n", (long)tret);
+    exit(0);
+&#125;
+&nbsp
+在Linux中，其结果如下：
+thread 2 start
+thread 2 push complete
+cleanup: thread 2 second handler
+cleanup: thread 2 first handler
+thread 1 start
+thread 1 push complete
+thread 1 exit code 1
+thread 2 exit code 2
+可以看到，线程1和线程2都正常启动和退出，但只有线程2的清理程序被调用。因此可以判断，若线程通过返回启动例程的方式终止，则不会调用清理程序；若线程通过pthread_exit()函数终止，则会调用清理程序。注意，清理程序的调用顺序与它们创建时相反。
+</pre></code>
+</details>
+
+<p>在FreeBSD和Mac OS X中，上述程序会发生段异常并产生core文件。因为在这两个平台上，pthread_cleanup_push是用宏实现，宏把某些上下文存放在栈上。线程1在pthread_cleanup_push和pthread_cleanup_pop之间返回时，栈已被改写，此时清理程序会调用被改写的上下文。<strong>唯一的可移植方法时调用pthread_exit函数</strong>。</p>
+<p>下面总结线程函数和进程函数的相似之处，如下表所示：</p>
+<table>
+<thead>
+<tr>
+<th align="left">进程原语</th>
+<th align="left">线程原语</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">fork</td>
+<td align="left">pthread_create</td>
+<td align="left">创建新的控制流</td>
+</tr>
+<tr>
+<td align="left">exit</td>
+<td align="left">pthread_exit</td>
+<td align="left">从现有的控制流中退出</td>
+</tr>
+<tr>
+<td align="left">waitpid</td>
+<td align="left">pthread_join</td>
+<td align="left">从控制流中得到退出状态</td>
+</tr>
+<tr>
+<td align="left">atexit</td>
+<td align="left">pthread_cleanup_push</td>
+<td align="left">注册在退出控制流时调用的函数</td>
+</tr>
+<tr>
+<td align="left">getpid</td>
+<td align="left">pthread_self</td>
+<td align="left">获取控制流的ID</td>
+</tr>
+<tr>
+<td align="left">abort</td>
+<td align="left">pthread_cancel</td>
+<td align="left">请求控制流的非正常退出</td>
+</tr>
+</tbody></table>
+<p>在默认情况下，线程的终止状态会保持到对该线程调用pthread_join（和进程中直到父进程调用waitpid相似）。但如果线程分离，线程的底层存储资源会在线程终止时立即被收回。在线程被分离后，不能通过pthread_join等待它的终止状态，对分离状态的线程调用pthread_join会产生未定义行为。</p>
+<p>可以通过调用pthread_detach分离线程</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_detach</span><span class="params">(<span class="keyword">pthread_t</span> tid)</span></span>;</span><br><span class="line">								返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<h1 id="线程同步"><a href="#线程同步" class="headerlink" title="线程同步"></a>线程同步</h1><p>当多个控制线程共享相同的内存时，需要确保每个线程看到一致的数据。当一个线程可以修改变量，其他线程也可以读取或修改时，则需要对这些线程进行同步，确保它们在访问变量的存储内容时不会访问到无效的值。</p>
+<h2 id="锁"><a href="#锁" class="headerlink" title="锁"></a>锁</h2><p>当一个线程修改一个变量时，其他线程在读取这个变量时可能会看到不一致的值。若变量修改时间多于一个内存访问周期的的处理器结构中，当内存读与内存写这两个周期交叉时，这种不一致就会出现。</p>
+<p>如下图所示，可以看到线程B的内存读操作在线程A的内存写操作（这里内存写需要两个周期）之间，此时线程B内存读的变量，它会与线程A内存写的变量不一致。</p>
+<p><img src="/images/two_threads_Interleave.PNG" alt="两个线程内存周期交叉"></p>
+<p>为了解决该问题，可以使用<strong>锁</strong>，锁保证同一时间只允许一个线程访问该变量。如下图所示，可以看到，当线程A或线程B想操作变量时均需要获取锁。锁只能一个时间由一个线程拥有，这样线程B在线程A释放锁前就不能读取该变量。</p>
+<p><img src="/images/two_threads_synchronize.PNG" alt="两个线程同步内存访问" title="两个线程同步内存访问"></p>
+<p>当两个或以上的线程试图在同一时间修改同一变量时，也需要进行同步。下图为考虑增量操作的情况，增量操作通常分解为3步：</p>
+<ol>
+<li>从内存单元将变量读入寄存器</li>
+<li>在寄存器中对变量做增量操作</li>
+<li>把新值写回内存单元</li>
+</ol>
+<p><img src="/images/two_threads_increment_same_variable.PNG" alt="两个非同步线程对同一变量做增量操作"></p>
+<p>图中可以看到，两个线程试图在同一时间对同一个变量做增量操作，结果可能出现不一致，变量可能增加1，可能增加2，这取决于第二个线程开始操作时获取的数值。</p>
+<p>如果修改操作是原子操作，就不存在竞争。如果数据总是<strong>顺序一致</strong>出现（即1. 线程都必须按照程序顺序执行；2. 线程都只看到一个单一操作执行，每个操作都是原子执行，并立即对所有线程可见），则不需要额外的同步操作。当多个线程观察不到数据的不一致，那么操作就是顺序一致的。但在现代计算机系统中，内存访问需要多个总线周期，多处理器的总线周期通常在多个处理器上是交叉的，因此不能保证数据是顺序一致的。</p>
+<h2 id="互斥量"><a href="#互斥量" class="headerlink" title="互斥量"></a>互斥量</h2><p>可以使用pthread的互斥接口来保护数据，确保同一时间只有一个线程访问数据。互斥量（mutex）本质上是一把锁，在访问共享资源时设置互斥量（加锁），在访问后释放互斥量（解锁）。在互斥量加锁后，任何试图再次对互斥量加锁的线程都会被阻塞，直到该线程释放该互斥锁。如果释放互斥量时由一个以上的线程阻塞，那么所有该锁上的阻塞线程变成可运行状态，第一个变为运行状态的线程对互斥量加锁，其他线程看到互斥量仍然时锁着的，则会再次进入阻塞状态直到互斥量可用。这种方式下，每次只有一个线程可以执行。</p>
+<p>只有将所有线程都设置成遵守相同数据访问规则时，互斥机制才能正常工作。操作系统并不会为我们做数据访问的串行化。</p>
+<p>互斥变量可以用pthread_mutex_t数据类型表示。在使用互斥变量前，需要将其进行初始化，可以把它设置为常量PTHREAD_MUTEX_INITIALIZER（只适用于静态分配的互斥量），也可以通过调用pthread_mutex_init函数进行初始化。如果是动态分配互斥量（例如，调用malloc函数），在释放内存前需要调用pthread_mutex_destroy函数。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_mutex_init</span><span class="params">(<span class="keyword">pthread_mutex_t</span> *<span class="keyword">restrict</span> mutex,</span></span></span><br><span class="line"><span class="params"><span class="function">                       <span class="keyword">const</span> <span class="keyword">pthread_mutexattr_t</span> * <span class="keyword">restrict</span> attr)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_mutex_destroy</span><span class="params">(<span class="keyword">pthread_mutex_t</span> *mutex)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>attr表示互斥量的属性，需要用默认属性初始化互斥量时，可以将attr设为NULL。</p>
+<p>对互斥量进行加锁，需要调用pthread_mutex_lock。如果互斥量已经上锁，调用线程将阻塞直到互斥量被解锁。对互斥量解锁，需要调用pthread_mutex_unlock。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_mutex_lock</span><span class="params">(<span class="keyword">pthread_mutex_t</span> *mutex)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_mutex_trylock</span><span class="params">(<span class="keyword">pthread_mutex_t</span> *mutex)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_mutex_unlock</span><span class="params">(<span class="keyword">pthread_mutex_t</span> *mutex)</span></span>;</span><br><span class="line">								所有函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>如果希望线程不被阻塞，可以使用pthread_mutex_trylock尝试对互斥量加锁。如果调用该函数时互斥量处于未锁住状态，则该函数会锁住互斥量并返回0而不会出现阻塞，否则该函数调用失败，不能锁住互斥量，返回EBUSY。</p>
+<h3 id="实例"><a href="#实例" class="headerlink" title="实例"></a>实例</h3><details>
+    <summary>> 互斥量保护数据结构</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+&nbsp
+struct foo &#123;
+    int             f_count;
+    pthread_mutex_t f_lock;
+    int             f_id;
+    /* ... more stuff here ...*/
+&#125;;
+&nbsp
+struct foo *
+foo_alloc(int id) /* allocate the object */
+&#123;
+    struct foo *fp;
+&nbsp
+    if ((fp = malloc(sizeof(struct foo))) != NULL) &#123;
+        fp->f_count = 1;
+        fp->f_id = id;
+        /* init mutex */
+        if (pthread_mutex_init(&fp->f_lock, NULL) != 0) &#123;
+            free(fp);
+            return (NULL);
+        &#125;
+        /* ... continue initialization ... */
+    &#125;
+    return (fp);
+&#125;
+&nbsp
+void 
+foo_hold(struct foo *fp) /* add a reference to the object */
+&#123;
+    pthread_mutex_lock(&fp->f_lock);
+    fp->f_count++;
+    pthread_mutex_unlock(&fp->f_lock);
+&#125;
+&nbsp
+void 
+foo_rele(struct foo *fp) /* release a reference to the object */
+&#123;
+    pthread_mutex_lock(&fp->f_lock);
+    if (--fp->f_count == 0) &#123; /* last reference */
+        pthread_mutex_unlock(&fp->f_lock);
+        pthread_mutex_destroy(&fp->f_lock);
+        free(fp);
+    &#125;
+    else &#123;
+        pthread_mutex_unlock(&fp->f_lock);
+    &#125;
+&#125;
+</code></pre>
+</details>
+上述程序描述了保护某个数据结构的互斥量。当一个以上的线程需要访问**动态分配**的对象时，可以在对象中嵌入引用计数，确保在所有使用该对象的线程完成数据访问之前，该对象内存空间不会被释放。
+
+<p>在foo_alloc函数中为初始化计数器，并不需要加锁，因为在该操作前分配线程是唯一引用该对象的线程。后续如果该对象被放到一个列表中，则它可能被其他线程发现，此时需要对它加锁。</p>
+<p>在使用该对象时，线程需要调用foo_hold为该对象的引用计数加1。当线程对使用完毕后，必须调用foo_rele释放引用。当最后一个引用被释放时，该对象所占的空间就被释放。</p>
+<p>该例子中，忽视了线程在调用foo_hold时如何找到该对象。如果另一个线程在调用foo_hold时阻塞等待互斥锁，这时即使该对象引用计数为0，也foo_rele不应该释放该对象（的内存空间）。我们可以通过确保在释放内存之前找不到该对象来避免这个问题。</p>
 
       
 
@@ -398,6 +761,19 @@ new thread:  pid 3037 tid 140295829985024 (0x7f992b1c1700)
         </div>
         
         
+        <div class="toc-container tooltip-left">
+            <i class="icon-font icon-category"></i>
+            <div class="tooltip tooltip-east">
+                <span class="tooltip-item">
+                </span>
+                <span class="tooltip-content">
+                    <div class="toc-article">
+                    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A6%82%E5%BF%B5"><span class="toc-number">1.</span> <span class="toc-text">线程概念</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A0%87%E8%AF%86"><span class="toc-number">2.</span> <span class="toc-text">线程标识</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%88%9B%E5%BB%BA"><span class="toc-number">3.</span> <span class="toc-text">线程创建</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E7%BB%88%E6%AD%A2"><span class="toc-number">4.</span> <span class="toc-text">线程终止</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E8%A6%86%E5%86%99"><span class="toc-number">4.1.</span> <span class="toc-text">内存覆写</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%90%8C%E6%AD%A5"><span class="toc-number">5.</span> <span class="toc-text">线程同步</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%94%81"><span class="toc-number">5.1.</span> <span class="toc-text">锁</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%92%E6%96%A5%E9%87%8F"><span class="toc-number">5.2.</span> <span class="toc-text">互斥量</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B"><span class="toc-number">5.2.1.</span> <span class="toc-text">实例</span></a></li></ol></li></ol></li></ol>
+                    </div>
+                </span>
+            </div>
+        </div>
+        
     </div>
 </aside>
 
@@ -504,15 +880,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
           <ul class="article-tag-list" q-show="showTags">
              
               <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color4">Markdown</a>
+              </li>
+             
+              <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color3">线程</a>
               </li>
              
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color5">APUE</a>
-              </li>
-             
-              <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color4">Markdown</a>
               </li>
             
             <div class="clearfix"></div>
@@ -669,5 +1045,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
 
 </div>
   </div>
+
 </body>
 </html>
+

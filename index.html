@@ -289,63 +289,14 @@
 <p>FreeBSD 8.0和Mac OS X 10.6.8用一个指向pthread结构的指针表示pthread_t。</p>
 </blockquote>
 <p>线程可以通过pthread_self函数获取自身线程ID。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">pthread_t</span> <span class="title">pthread_selt</span><span class="params">(<span class="keyword">void</span>)</span></span>;</span><br><span class="line">								返回值：调用线程的线程ID</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">pthread_t</span> <span class="title">pthread_self</span><span class="params">(<span class="keyword">void</span>)</span></span>;</span><br><span class="line">								返回值：调用线程的线程ID</span><br></pre></td></tr></table></figure>
 
 <p>当线程需要识别以线程ID为标识的数据结构时，pthread_self函数和pthread_equal可以一起使用。如：</p>
 <p>下图为<strong>主线程控制工作队列</strong>实例。可以看到，主线程可以将新作业放进工作队列中，另外3个线程组成的线程池从队列中移出作业，当然线程不能任意从队列顶端取出作业，而是<strong>由主线程控制作业分配</strong>，主线程会在每个待处理作业的结构中标志处理该作业的线程ID，<strong>每个工作线程</strong>只能<strong>移除有自己线程ID的作业</strong>。</p>
 <p><img src="/images/work_queue.PNG" alt="工作队列实例"></p>
-<h1 id="线程创建"><a href="#线程创建" class="headerlink" title="线程创建"></a>线程创建</h1><p>在创建多个控制线程之前，程序的行为与传统进程并无区别。新增线程可以通过调用pthread_create函数创建。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_create</span><span class="params">( <span class="keyword">pthread_t</span> *<span class="keyword">restrict</span> tidp, </span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">void</span> *(*start_rtn)(<span class="keyword">void</span> *), </span></span></span><br><span class="line"><span class="params"><span class="function">                    <span class="keyword">void</span> *<span class="keyword">restrict</span> arg)</span></span>;</span><br><span class="line">								返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
-
-<p>当pthread_create成功返回时，新创建的线程ID设置在tidp指向的内存单元。attr参数用于定制不同的线程属性（为NULL时，创建一个具有默认属性的线程）。</p>
-<p>新创建的线程从start_rtn函数的地址开始运行，arg是该函数的参数。如果要向start_rtn函数传递一个以上的参数，则可以将参数放入一个结构中，然后把这个结构的地址作为arg参数传入。</p>
-<p>线程创建时不能保证哪个线程会先运行，新创建的线程可以访问进程的地址空间，并且继承调用线程的浮点环境和信号屏蔽字，但是该线程的挂起信号集会被清除。</p>
-<p>注意，pthread函数在调用失败会返回错误码，因为每个线程都提供errno副本，这样就可以与使用errno的函数兼容。</p>
-<p>注意，在pthread_create函数返回之前新线程就可能开始执行。</p>
-<details>
-    <summary>>打印线程ID</summary>
-<pre><code>#include "apue.h"
-#include &ltpthread.h&gt
-pthread_t ntid;
-void printids(const char *s)
-&#123;
-    pid_t       pid;
-    pthread_t   tid;
-    pid = getpid();
-    tid = pthread_self();
-    printf("%s pid %lu tid %lu (0x%lx)\n", s, (unsigned long)pid, (unsigned long)tid, (unsigned long)tid);
-&#125;
-void *thr_fn(void *arg)
-&#123;
-    printids("new thread: ");
-    return ((void *)0);
-&#125;
-int main(void)
-&#123;
-    int err;
-    err = pthread_create(&ntid, NULL, thr_fn, NULL);
-    if (err != 0)
-        err_exit(err, "can't create thread");
-    printids("main thread: ");
-    sleep(1);
-    exit(0);
-&#125;
-在Linux下运行结果是：
-main thread:  pid 3037 tid 140295829989184 (0x7f992b1c2740)
-new thread:  pid 3037 tid 140295829985024 (0x7f992b1c1700)
-可以看到，两个线程的进程ID均为3037，两个线程ID不同。
-</code></pre>
-</details>
-
-
-<h1 id="线程终止"><a href="#线程终止" class="headerlink" title="线程终止"></a>线程终止</h1><p>如果进程中的任一线程调用了exit、_Exit、_exit，那么整个进程都会终止。与此类似，如果默认的动作（信号）是终止进程，那么发送到线程的信号会终止整个进程。</p>
-<p>单个线程可以在不终止整个进程的情况下，通过3种方式退出，从而停止它的控制流：</p>
-<ul>
-<li>线程可以简单地从启动例程中返回，返回值是线程的退出码</li>
-<li>线程可以被同一进程中的其他进程取消</li>
-<li>线程调用pthread_exit</li>
-</ul>
-
+        
+          <a class="article-more-a" href="/2021/08/29/APUE-%E7%AC%AC11%E7%AB%A0-%E7%BA%BF%E7%A8%8B/#more">more >></a>
+        
       
 
       
@@ -506,15 +457,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
           <ul class="article-tag-list" q-show="showTags">
              
               <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color4">Markdown</a>
+              </li>
+             
+              <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color3">线程</a>
               </li>
              
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color5">APUE</a>
-              </li>
-             
-              <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color4">Markdown</a>
               </li>
             
             <div class="clearfix"></div>
@@ -671,5 +622,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
 
 </div>
   </div>
+
 </body>
 </html>
+
