@@ -20,7 +20,7 @@
 <meta property="og:image" content="http://example.com/images/two_threads_synchronize.PNG">
 <meta property="og:image" content="http://example.com/images/two_threads_increment_same_variable.PNG">
 <meta property="article:published_time" content="2021-08-29T08:12:26.000Z">
-<meta property="article:modified_time" content="2021-09-04T15:22:04.396Z">
+<meta property="article:modified_time" content="2021-09-05T15:04:34.190Z">
 <meta property="article:author" content="AZheng">
 <meta property="article:tag" content="线程">
 <meta property="article:tag" content="APUE">
@@ -616,6 +616,300 @@ foo_rele(struct foo *fp) /* release a reference to the object */
 <p>在foo_alloc函数中为初始化计数器，并不需要加锁，因为在该操作前分配线程是唯一引用该对象的线程。后续如果该对象被放到一个列表中，则它可能被其他线程发现，此时需要对它加锁。</p>
 <p>在使用该对象时，线程需要调用foo_hold为该对象的引用计数加1。当线程对使用完毕后，必须调用foo_rele释放引用。当最后一个引用被释放时，该对象所占的空间就被释放。</p>
 <p>该例子中，忽视了线程在调用foo_hold时如何找到该对象。如果另一个线程在调用foo_hold时阻塞等待互斥锁，这时即使该对象引用计数为0，也foo_rele不应该释放该对象（的内存空间）。我们可以通过确保在释放内存之前找不到该对象来避免这个问题。</p>
+<h2 id="避免死锁"><a href="#避免死锁" class="headerlink" title="避免死锁"></a>避免死锁</h2><p>如果一个线程试图对一个互斥量加锁两次，那么它自身会陷入死锁状态。在使用互斥量时，其他方式也可能产生死锁。例如，程序使用一个以上的互斥量，线程1占有第一个互斥量，请求第二个互斥量时阻塞，但线程2占有第二个互斥量，请求第一个互斥量时阻塞，由于两个线程都在相互请求另一个线程拥有的资源，所以两个线程都无法运行，于是陷入死锁状态。</p>
+<p>可以通过控制互斥量加锁顺序来避免死锁。例如，需要对两个互斥量A和B同时加锁，所有线程只有在锁住互斥量A后才能对互斥量B加锁，这样两个互斥量就避免了死锁（当然在其他资源上也可能出现死锁）。</p>
+<p>只有当一个线程试图以另一个线程相反的顺序锁住互斥量时，才会有可能发生死锁。</p>
+<p>有时候，应用程序的结构使得对互斥量进行排序十分困难。如果涉及太多的锁和数据结构，可用函数不能把它转换成简单层次，那么就需要采用另外的方法：线程可以使用pthread_mutex_trylock接口避免死锁。如果线程已占有某些锁，并且pthread_mutex_trylock接口返回成功，则程序继续执行；如果函数调用失败，则线程释放已占有的锁，做好清理工作，后续在重新尝试。</p>
+<h3 id="实例-1"><a href="#实例-1" class="headerlink" title="实例"></a>实例</h3><details>
+    <summary>>使用两个互斥量，hash表的操作</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+/* 此处哈希表为拉链法，即通过链表解决哈希冲突 */
+#define NHASH 29    /* 哈希表的大小 */
+#define HASH(id) (((unsigned long)id) % NHASH) /* 获取哈希值 */
+&nbsp
+struct foo *fh[NHASH];    /* 哈希表，公共变量，会被所有线程发现 */
+pthread_mutex_t hashlock = PTHREAD_MUTEX_INITIALIZER; /* 初始化哈希表锁hashlock */
+&nbsp
+struct foo &#123;
+    int             f_count;
+    pthread_mutex_t f_lock;
+    int             f_id;
+    struct foo      *f_next;    /* protected by hashlock */
+    /* ... more stuff here ... */
+&#125;;
+&nbsp
+struct foo*
+foo_alloc(int id) /* allocate the object */
+&#123;
+    struct foo   *fp;
+    int          idx;
+&nbsp
+    if ((fp = malloc(sizeof(struct foo))) != NULL) &#123;
+        fp->f_count = 1;
+        fp->f_id = id;
+        if (pthread_mutex_init(&fp->f_lock, NULL) != 0) &#123;
+            free(fp);
+            return (NULL);
+        &#125;
+        idx = HASH(id);
+        /* 可以看到这里要使用两个互斥量，则先锁hashlock，后锁f_lock */
+        pthread_mutex_lock(&hashlock);
+        /* 下面两步是将foo节点插入哈希表中 */
+        fp->f_next = fh[idx];
+        fh[idx] = fp;
+        pthread_mutex_lock(&fp->f_lock);
+        pthread_mutex_unlock(&hashlock);
+        /* ...continue initialization ... */
+        pthread_mutex_unlock(&fp->f_lock);
+    &#125;
+    return (fp);
+&#125;
+&nbsp
+void  
+foo_hold(struct foo *fp) /* add reference to the object */
+&#123;
+    /* 可以看到，f_count是由f_lock保护 */
+    pthread_mutex_lock(&fp->f_lock);
+    fp->f_count++;
+    pthread_mutex_unlock(&fp->f_lock);
+&#125;
+&nbsp
+struct foo *
+foo_find(int id) /* find an existing object */
+&#123;
+    struct foo *fp;
+    /* 这里只对哈希表操作，而不修改foo节点的内容，因此只需要锁hashlock */
+    pthread_mutex_lock(&hashlock);
+    for (fp = fh[HASH(id)]; fp != NULL; fp = fp->f_next) &#123;
+        if (fp->f_id == id) &#123;
+            foo_hold(fp);
+            break;
+        &#125;
+    &#125;
+    pthread_mutex_unlock(&hashlock);
+    return (fp);
+&#125;
+&nbsp
+void 
+foo_rele(struct foo *fp) /* release a reference to the object */
+&#123;
+    struct foo  *tfp;
+    int         idx;
+&nbsp
+    pthread_mutex_lock(&fp->f_lock);
+    if (fp->f_count == 1) &#123; /* last reference */
+    /* 当fp节点此时引用数为1，即只有最后一个引用，因此需要将引用减1之后释放该节点 */
+        pthread_mutex_unlock(&fp->f_lock);
+        pthread_mutex_lock(&hashlock);
+        phtread_mutex_lock(&fp->f_lock);
+        /* need to recheck the condition */
+        /* 这里对f_count进行了二次判断，因为在上一个if语句后，获取hashlock之前，其他线程可能修改f_count的值，因此需要对f_count进行二次判断 */
+        if (fp->f_count != 1) &#123;
+            fp->f_count--;
+            pthread_mutex_unlock(&fp->f_lock);
+            pthread_mutex_unlock(&hashlock);
+            return;
+        &#125;
+        /* remove from list */
+        idx = HASH(fp->f_id);
+        tfp = fh[idx];
+        /* 寻找hash表中对应的foo节点并删除 */
+        if (tfp == fp) &#123;
+            fh[idx] = fp->f_next;
+        &#125;
+        else &#123;
+            while (tfp->f_next != fp)
+                tfp = tfp->f_next;
+            tfp->f_next = fp->f_next;
+        &#125;
+        /* 先释放hashloc，在释放f_lock */
+        pthread_mutex_unlock(&hashlock);
+        pthread_mutex_unlock(&fp->f_lock);
+        pthread_mutex_destroy(&fp->f_lock);
+        free(fp);
+    &#125;
+    else &#123;
+        /* 若fp节点引用不为1，则需简单地减1即可，不需要释放foo节点 */
+        fp->f_count--;
+        pthread_mutex_unlock(&fp->f_lock);
+    &#125;
+&#125;
+</code></pre>
+</details>
+
+<p>上述程序，展现了两个互斥量的操作，这里通过让它们以相同的顺序加锁（可以看到，当需要使用两个互斥量时，先锁hashlock，在锁f_lock），这样就可以避免死锁。hashlock互斥量用于保护散列表fh和foo结构体中的散列字段f_next。f_lock互斥量保护foo结构体中的其他字段。</p>
+<p>foo_find函数先锁住散列表锁hashlock，然后在散列表中寻找对应的foo节点，找到后调用foo_hold函数，锁住foo节点对应的锁f_lock，然后将对应节点的f_count加1。</p>
+<p>foo_rele函数相比于一个互斥量的情况，实现更加的复杂。代码相应的解释已在上述代码中描述。</p>
+<p>可以看到这种锁方法十分复杂。我们可以把散列表锁(hashlock)来保护结构引用计数，结构锁(f_lock)用于保护foo结构中的所有其他内容。</p>
+<details>
+    <summary>>简化的锁</summary>
+<pre><code>#include &ltstdlib.h&gt
+#include &ltpthread.h&gt
+&nbsp
+#define NHASH 29
+#define HASH(id) (((unsigned int)id) % NHASH)
+&nbsp
+struct foo *fh[NHASH];
+pthread_mutex_t hashlock = PTHREAD_MUTEX_INITIALIZER;
+&nbsp
+struct foo &#123;
+    int             f_count;    /* protected by hashlock */
+    pthread_mutex_t f_lock;
+    int             f_id;
+    struct foo      *f_next;    /* protected by hashlock */
+    /* ... more stuff here ... */
+&#125;;
+&nbsp
+struct foo *
+foo_alloc(int id) /* allocate the object */
+&#123;
+    struct foo  *fp;
+    int         idx;
+ &nbsp   
+    if ((fp = malloc(sizeof(struct foo))) != NULL) &#123;
+        fp-> f_count = 1;
+        fp->f_id = id;
+        if (pthread_mutex_init(&fp->f_lock, NULL) != 0) &#123;
+            free(fp);
+            return (NULL);
+        &#125;
+        idx = HASH(id);
+        pthread_mutex_lock(&hashlock);
+        fp->f_next = fh[idx];
+        fh[idx] = fp;
+        pthread_mutex_lock(&fp->f_lock);
+        pthread_mutex_unlock(&hashlock);
+        /* ...continue initialization ... */
+        pthread_mutex_unlock(&fp->f_lock);
+    &#125;
+    return (fp);
+&#125;
+&nbsp
+void
+foo_hold(struct foo *fp) &#123; /* add a reference to the object */
+    /* 可以看到，这里通过散列锁hashlock保护f_count */
+    pthread_mutex_lock(&hashlock);
+    fp->f_count++;
+    pthread_mutex_unlock(&hashlock);   
+&#125;
+&nbsp
+struct foo *
+foo_find(int id) /* find an existing object */
+&#123;
+    struct foo  *fp;
+&nbsp
+    pthread_mutex_lock(&hashlock);
+    for (fp = fh[HASH(id)]; fp != NULL; fp = fp->f_next) &#123;
+        if (fp->f_id == id) &#123;
+            fp->f_count++;
+            break;
+        &#125;
+    &#125;
+    pthread_mutex_unlock(&hashlock);
+    return (fp);
+&#125;
+&nbsp
+void 
+foo_rele(struct foo *fp) /* release a reference to the object */
+&#123; 
+    struct foo  *tfp;
+    int         idx;
+&nbsp
+    pthread_mutex_lock(&hashlock);
+    if (--fp->f_count == 0) &#123; /* last reference,remove from list */
+        idx = HASH(fp->f_id);
+        tfp = fh[idx];
+        if (tfp == fp) &#123;
+            fh[idx] = fp->f_next;
+        &#125;
+        else &#123;
+            while (tfp->f_next != fp) 
+                tfp = tfp->f_next;
+            tfp->f_next = fp->f_next;
+        &#125;
+        pthread_mutex_unlock(&hashlock);
+        pthread_mutex_destroy(&fp->f_lock);
+        free(fp);
+    &#125;
+    else &#123;
+        pthread_mutex_unlock(&hashlock);
+    &#125;
+&#125;
+</code></pre>
+</details>
+
+<p>可以看到，这里的程序比上一个程序简单许多，在这里f_count也通过hashlock保护，因此涉及f_count的操作都不需要结构锁f_lock，围绕散列表和引用计数的锁排序问题就不存在了。但是，这里也存在一个问题，都使用hashlock时，导致该锁的粒度太粗，导致程序性能不佳。</p>
+<p>在多线程程序中，如果锁的粒度太粗，就会出现很多线程阻塞等待相同的锁，导致不能改善并发性。如果锁的粒度太细，那么过多的锁开销会使系统性能收到影响，而且代码变得更加复杂。因此需要在满足锁需求的情况下，在代码复杂度和性能之间找到正确的平衡。</p>
+<h2 id="函数pthread-mutex-timedlock"><a href="#函数pthread-mutex-timedlock" class="headerlink" title="函数pthread_mutex_timedlock"></a>函数pthread_mutex_timedlock</h2><p>pthread_mutex_timedlock可以绑定线程阻塞时间。pthread_mutex_timedlock和pthread_mutex_lock基本等价，但是当pthread_mutex_timedlock超过设定的时间值后，其不会对互斥量进行加锁而阻塞，而是返回错误码ETIMEDOUT。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;time.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_mutex_timedlock</span><span class="params">(<span class="keyword">pthread_mutex_t</span> *<span class="keyword">restrict</span> mutex,</span></span></span><br><span class="line"><span class="params"><span class="function">                            <span class="keyword">const</span> struct timespec *<span class="keyword">restrict</span> tsptr)</span></span>;</span><br><span class="line">								返回值：若成功，返回<span class="number">0</span>；否则，返回错误编码</span><br></pre></td></tr></table></figure>
+
+<p>这里的tsptr值指定的绝对时间（与相对时间相反，这里指我们愿意阻塞到时间X，而不是愿意阻塞Y秒）。这个超时时间就是timespec结构表示。可以通过该函数避免线程永久阻塞。</p>
+<h3 id="实例-2"><a href="#实例-2" class="headerlink" title="实例"></a>实例</h3><details>
+    <summary>>使用pthread_mutex_timedlock</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+&nbsp
+int
+main(void)
+&#123;
+    int err;
+    struct timespec tout;
+    struct tm *tmp;
+    char buf[64];
+    pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+&nbsp
+    pthread_mutex_lock(&lock);    /* 主线程锁住lock */
+    printf("mutex is locked\n");
+&nbsp
+    /* 获取时钟CLOCK_REALTIME的当前值并将其存储在tout中。 */
+    clock_gettime(CLOCK_REALTIME, &tout);    
+    /* 将tout.tv_sec转换成struct tm格式 */
+    tmp = localtime(&tout.tv_sec);
+    /* 将struct tm格式的tmp转换成字符串 */
+    strftime(buf, sizeof(buf), "%r", tmp);
+    printf("current time is %s\n", buf);
+    tout.tv_sec += 10;
+    /* caution: this could lead to deadlock */
+    /*主线程试图去获取lock，但之前lock已被主线程锁定，因此会进入死锁状态 */
+    err = pthread_mutex_timedlock(&lock, &tout); 
+    clock_gettime(CLOCK_REALTIME, &tout);
+    tmp = localtime(&tout.tv_sec);
+    strftime(buf, sizeof(buf), "%r", tmp);
+    printf("the time is now %s\n", buf);
+    if (err == 0)
+        printf("mutex locked again!\n");
+    else 
+        printf("can't lock mutex again: %s\n", strerror(err));
+    exit(0);
+&#125;
+&nbsp
+Linux中的输出结果为：
+mutex is locked
+current time is 08:28:51 PM
+the time is now 08:29:01 PM
+can't lock mutex again: Connection timed out
+</code></pre>
+</details>
+
+<p>这个程序故意对已有互斥量进行加锁，演示pthread_mutex_timedlock的工作。不推荐在实际中使用这种策略，这会导致死锁。</p>
+<blockquote>
+<p>Mac OS没有支持pthread_mutex_timedlock，FreeBSD 8.0和Linux3.2.0以及Solaris 10支持该函数。</p>
+</blockquote>
+<h2 id="读写锁"><a href="#读写锁" class="headerlink" title="读写锁"></a>读写锁</h2><p>读写锁（reader-writer lock）与互斥量类似，不过读写锁允许更高的并行性。互斥锁要么是加锁状态，要么是不加锁状态，而且一次只有一个线程可以对其加锁。读写锁可以有3种状态：（1）读模式下加锁状态、（2）写模式下加锁状态、（3）不加锁状态。一次只有一个线程可以占有写模式的读写锁，但是多个线程可以同时占有读模式的读写锁。</p>
+<p>当读写锁为写加锁状态时，在解锁之前，所有试图多该锁加锁的线程都会被阻塞。当读写锁处于读加锁状态时，所有试图以读模式对其加锁的线程都可以获得访问权，但是任何写模式加锁的线程都会阻塞，直到所有线程释放读锁为止。</p>
+<p>当读写锁处于读模式加锁状态时，若有一个线程试图以写模式获取读写锁时，读写锁会阻塞后续的读锁请求，以避免读锁长期占用，而等待的写锁一直得不到满足。</p>
+<p>读写锁非常适用于对数据结构读的次数远大于写的情况。在读写锁的写模式下，它所保护的数据结构可以安全修改，因为一次只有一个线程可以在写模式下获取该锁。当读写锁处于读模式下，只要线程获取了读模式的锁，该锁保护的数据结构就可以被多个获得读模式锁的线程读取。</p>
+<p>读写锁也被称为共享互斥锁（shared-exclusive lock）。读模式下，称为以共享模式锁住；写模式下，称为互斥模式锁住。</p>
+<p>与互斥量相比，读写锁在使用之前必须初始化，在释放它们底层的内存之前必须销毁。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_init</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *<span class="keyword">restrict</span> rwlock,</span></span></span><br><span class="line"><span class="params"><span class="function">                        <span class="keyword">const</span> <span class="keyword">pthread_rwlockattr_t</span> *<span class="keyword">restrict</span> attr)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_destroy</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *rwlock)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>读写锁通过调用pthread_rwlock_init进行初始化，如果希望读写锁拥有默认属性，可以传一个null指针给attr。</p>
+<p>PTHREAD_RWLOCK_INITIALIZER常量（默认属性）也可用于对静态分配的读写锁进行初始化。</p>
+<p>在释放读写锁占用的内存之前，需要调用pthread_rwlock_destroy做清理工作。如果pthread_rwlock_init为读写锁分配资源，pthread_rwlock_destroy将释放这些资源。</p>
+<p>在读模式下锁定读写锁，需要调用pthread_rwlock_rdlock。在写模式下锁定读写锁，需要调用pthread_rwlock_wrlock。不管以何种方式获取读写锁，都可以调用pthread_rwlock_unlock释放锁。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_rdlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *rwlock)</span></span>;</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
 
       
 
@@ -768,7 +1062,7 @@ foo_rele(struct foo *fp) /* release a reference to the object */
                 </span>
                 <span class="tooltip-content">
                     <div class="toc-article">
-                    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A6%82%E5%BF%B5"><span class="toc-number">1.</span> <span class="toc-text">线程概念</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A0%87%E8%AF%86"><span class="toc-number">2.</span> <span class="toc-text">线程标识</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%88%9B%E5%BB%BA"><span class="toc-number">3.</span> <span class="toc-text">线程创建</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E7%BB%88%E6%AD%A2"><span class="toc-number">4.</span> <span class="toc-text">线程终止</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E8%A6%86%E5%86%99"><span class="toc-number">4.1.</span> <span class="toc-text">内存覆写</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%90%8C%E6%AD%A5"><span class="toc-number">5.</span> <span class="toc-text">线程同步</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%94%81"><span class="toc-number">5.1.</span> <span class="toc-text">锁</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%92%E6%96%A5%E9%87%8F"><span class="toc-number">5.2.</span> <span class="toc-text">互斥量</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B"><span class="toc-number">5.2.1.</span> <span class="toc-text">实例</span></a></li></ol></li></ol></li></ol>
+                    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A6%82%E5%BF%B5"><span class="toc-number">1.</span> <span class="toc-text">线程概念</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A0%87%E8%AF%86"><span class="toc-number">2.</span> <span class="toc-text">线程标识</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%88%9B%E5%BB%BA"><span class="toc-number">3.</span> <span class="toc-text">线程创建</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E7%BB%88%E6%AD%A2"><span class="toc-number">4.</span> <span class="toc-text">线程终止</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E8%A6%86%E5%86%99"><span class="toc-number">4.1.</span> <span class="toc-text">内存覆写</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%90%8C%E6%AD%A5"><span class="toc-number">5.</span> <span class="toc-text">线程同步</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%94%81"><span class="toc-number">5.1.</span> <span class="toc-text">锁</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%92%E6%96%A5%E9%87%8F"><span class="toc-number">5.2.</span> <span class="toc-text">互斥量</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B"><span class="toc-number">5.2.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%81%BF%E5%85%8D%E6%AD%BB%E9%94%81"><span class="toc-number">5.3.</span> <span class="toc-text">避免死锁</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B-1"><span class="toc-number">5.3.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%BD%E6%95%B0pthread-mutex-timedlock"><span class="toc-number">5.4.</span> <span class="toc-text">函数pthread_mutex_timedlock</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B-2"><span class="toc-number">5.4.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%BB%E5%86%99%E9%94%81"><span class="toc-number">5.5.</span> <span class="toc-text">读写锁</span></a></li></ol></li></ol>
                     </div>
                 </span>
             </div>
