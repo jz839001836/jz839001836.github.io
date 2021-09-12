@@ -20,7 +20,7 @@
 <meta property="og:image" content="http://example.com/images/two_threads_synchronize.PNG">
 <meta property="og:image" content="http://example.com/images/two_threads_increment_same_variable.PNG">
 <meta property="article:published_time" content="2021-08-29T08:12:26.000Z">
-<meta property="article:modified_time" content="2021-09-05T15:04:34.190Z">
+<meta property="article:modified_time" content="2021-09-12T15:20:20.034Z">
 <meta property="article:author" content="AZheng">
 <meta property="article:tag" content="线程">
 <meta property="article:tag" content="APUE">
@@ -908,8 +908,544 @@ can't lock mutex again: Connection timed out
 <p>PTHREAD_RWLOCK_INITIALIZER常量（默认属性）也可用于对静态分配的读写锁进行初始化。</p>
 <p>在释放读写锁占用的内存之前，需要调用pthread_rwlock_destroy做清理工作。如果pthread_rwlock_init为读写锁分配资源，pthread_rwlock_destroy将释放这些资源。</p>
 <p>在读模式下锁定读写锁，需要调用pthread_rwlock_rdlock。在写模式下锁定读写锁，需要调用pthread_rwlock_wrlock。不管以何种方式获取读写锁，都可以调用pthread_rwlock_unlock释放锁。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_rdlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *rwlock)</span></span>;</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_rdlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *rwlock)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">phtread_rwlock_wrlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *rwlock)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_unlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *rwlock)</span></span>;</span><br><span class="line">								所有函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
 
+<p>各种实现会对共享模式下的读写锁次数进行限制，所以需要检查pthread_rwlock_rdlock的返回值。错误返回值的定义只是针对不正确使用读写锁的情况（如未初始化锁），或者试图获取已拥有的锁导致可能产生死锁的情况。</p>
+<p>Single UNIX Specification还定义了读写锁原语的条件版本。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_tryrdlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *rwlock)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_trywrlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *rwlock)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>获取锁时，若成功返回0；否则，返回EBUSY。</p>
+<h3 id="读写锁的使用"><a href="#读写锁的使用" class="headerlink" title="读写锁的使用"></a>读写锁的使用</h3><details>
+    <summary> >读写锁的使用</summary>
+<pre><code>#include &ltstdlib.h&gt
+#include &ltpthread.h&gt
+struct job &#123;
+    struct job  *j_next;
+    struct job  *j_prev;
+    pthread_t   j_id;   /* tell which thread handles this jon */
+    /* ...more stuff here */
+&#125;;
+struct queue &#123;
+    struct job      *q_head;
+    struct job      *q_tail;
+    pthread_rwlock_t q_lock;
+&#125;;
+/*
+ * Initialize a queue
+ */
+  int
+  queue_init(struct queue *qp)
+  &#123;
+    int err;
+&nbsp
+    qp->q_head = NULL;
+    qp->q_tail = NULL;
+    err = pthread_rwlock_init(&qp->q_lock, NULL);
+    if (err != 0)
+        return (err);
+    /* ...continue initialization ... */
+    return (0);
+  &#125;
+  /*
+ * Insert a job at the head of the queue.
+ */
+    void
+    job_insert(struct queue *qp, struct job *jp)
+    &#123;
+    pthread_rwlock_wrlock(&qp->q_lock);
+    jp->j_next = qp->q_head;
+    jp->j_prev = NULL;
+    if (qp->q_head != NULL)
+        qp->q_head->j_prev = jp;
+    else
+        qp->q_tail = jp;    /* list was empty */
+    qp->q_head = jp;
+    pthread_rwlock_unlock(&qp->q_lock);
+    &#125;
+&nbsp
+/*
+ * Append a job on the tail of the queue
+ */
+    void
+    job_append(struct queue *qp, struct job *jp)
+    &#123;
+    pthread_rwlock_wrlock(&qp->q_lock);
+    jp->j_next = NULL;
+    jp->j_prev = qp->q_tail;
+    if (qp->q_tail != NULL)
+        qp->q_tail->j_next = jp;
+    else
+        qp->q_head = jp;    /* list was empty */
+    qp->q_tail = jp;
+    pthread_rwlock_unlock(&qp->q_lock);
+    &#125;
+&nbsp
+/* 
+ * Remove the given job from a queue
+ */
+    void
+    job_remove(struct queue *qp, struct job *jp)
+    &#123;
+    pthread_rwlock_wrlock(&qp->q_lock);
+    /* 双向链表的操作，如果删除节点是头节点 */
+    if (jp == qp->q_head) &#123;
+        qp->q_head = jp->j_next;
+        if (qp->q_tail == jp)
+            qp->q_tail = NULL;
+        else
+            jp->j_next->j_prev = jp->j_prev;
+    &#125;
+    /* 如果删除节点是尾节点 */
+    else if (jp == qp->q_tail) &#123;
+        qp->q_tail = jp->j_prev;
+        jp->j_prev->j_next = jp->j_next;
+    &#125;
+    /* 如果删除节点是中间节点 */
+    else &#123;
+        jp->j_prev->j_next = jp->j_next;
+        jp->j_next->j_prev = jp->j_prev;
+    &#125;
+    pthread_rwlock_unlock(&qp->q_lock);
+    &#125;
+&nbsp
+/*
+ * Find a job for the given thread ID.
+ */
+    struct job*
+    job_find(struct queue *qp, pthread_t id)
+    &#123;
+    struct job *jp;
+    if (phtread_rwlock_rdlock(&qp->q_lock) != 0)
+        return (NULL);
+&nbsp
+    for (jp = qp->q_head; jp != NULL; jp = jp->j_next)
+        if (pthread_equeal(jp->j_id, id))
+            break;
+&nbsp
+    pthread_rwlock_unlock(&qp->q_lock);
+    return (jp);
+    &#125;
+  </code></pre>
+  </details>
+
+<p>在上述例子，凡是需要想队列中增加作业或者从队列中删除作业时，都需要采用写模式来锁住队列的读写锁。对于搜索队列，可以采用读模式锁去获取读写锁，从而允许所有工作线程并发地搜索队列。只有在线程搜索作业的频率远远高于增加或删除作业时，使用读写锁才能改善心性能。</p>
+<p>工作线程只能从队列中读取与它们的线程ID匹配的作业。</p>
+<h3 id="带有超时的读写锁"><a href="#带有超时的读写锁" class="headerlink" title="带有超时的读写锁"></a>带有超时的读写锁</h3><p>与互斥量相同，Single UNIX Specification提供了带有超时的读写锁加锁函数，使应用程序在获取读写锁时避免陷入永久阻塞状态。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;time.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_timedrdlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *<span class="keyword">restrict</span> rwlock,</span></span></span><br><span class="line"><span class="params"><span class="function">                               <span class="keyword">const</span> struct timespec *<span class="keyword">restrict</span> tsptr)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_rwlock_timedwrlock</span><span class="params">(<span class="keyword">pthread_rwlock_t</span> *<span class="keyword">restrict</span> rwlock,</span></span></span><br><span class="line"><span class="params"><span class="function">                               <span class="keyword">const</span> struct timespec *<span class="keyword">restrict</span> tsptr)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>这两个函数的行为与不计时的版本类似，tsptr参数只想timespec结构，表示线程应该停止阻塞的时间。如果他们不能获取锁，那么超时到期后，这两个函数返回ETIMEDOUT错误。与pthread_mutex_timedlock函数类似，超时指定的是绝对时间，不是相对时间。</p>
+<h2 id="条件变量"><a href="#条件变量" class="headerlink" title="条件变量"></a>条件变量</h2><p>条件变量与互斥量一起使用时，允许线程以无竞争方式等待特定的条件发生。</p>
+<p>条件本身由互斥量保护。线程在改变条件状态之前必须首先锁住互斥量。其他线程直到它们获取互斥量之前都不会察觉到这种变化，因为只有锁住互斥锁才能计算条件变量。</p>
+<p>在使用条件变量之前，需要进行初始化。条件变量有两种初始化方式，可以把常量PTHREAD_COND_INITIALIZER复制给静态分配的条件变量，如果条件变量是动态分配的，则需要使用pthread_cond_init函数对它进行初始化。</p>
+<p>在释放条件变量的内存之前，需要使用pthread_cond_destroy函数对条件变量进行反初始化(deinitialize)。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_cond_init</span><span class="params">(<span class="keyword">pthread_cond_t</span> *<span class="keyword">restrict</span> cond,</span></span></span><br><span class="line"><span class="params"><span class="function">                      <span class="keyword">const</span> <span class="keyword">pthread_condattr_t</span> *<span class="keyword">restrict</span> attr)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_cond_destroy</span><span class="params">(<span class="keyword">pthread_cond_t</span> *cond)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>attr表示条件变量的属性，设为NULL表示默认的条件变量。</p>
+<p>我们可以使用pthread_cond_wait等待条件变量变为真。（pthread_cond_timedwait()）如果在给定的时间内条件不能满足，则会返回一个错误码。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_cond_wait</span><span class="params">(<span class="keyword">pthread_cond_t</span> *<span class="keyword">restrict</span> cond,</span></span></span><br><span class="line"><span class="params"><span class="function">                      <span class="keyword">pthread_mutex_t</span> *<span class="keyword">restrict</span> mutex)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_cond_timedwait</span><span class="params">(<span class="keyword">pthread_cond_t</span> *<span class="keyword">restrict</span> cond,</span></span></span><br><span class="line"><span class="params"><span class="function">                           pthread_mutex_restrict mutex,</span></span></span><br><span class="line"><span class="params"><span class="function">                           <span class="keyword">const</span> struct timespec *<span class="keyword">restrict</span> tsptr)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；</span><br></pre></td></tr></table></figure>
+
+<p>传递给 pthread_cond_wait 的互斥量保护条件变量。 调用者将互斥量传递给函数，然后函数以原子方式将调用线程放在等待条件的线程列表中并解锁互斥锁。 这会关闭检查条件的时间和线程进入睡眠等待条件更改的时间之间的窗口，以便线程不会错过条件的更改（<strong>如果不这么做，当在检查条件和线程进入睡眠之间的时间窗口内条件变量改变，如果后续条件不再发生改变，这会导致线程一直阻塞</strong>）。 当 pthread_cond_wait 返回时，互斥锁再次被锁定。</p>
+<p>对于tsptr参数，这是一个timespec结构，表示愿意等待的时间。可以使用clock_gettime函数获取timespec结构表示当前时间。但不是所有平台都支持该函数，可以通过gettimeofday获取timeval结构表示当前时间，然后把这个时间转换成timespec结构。</p>
+<p>要获得超时值的绝对时间，可以使用下面的函数（假设阻塞的最大时间使用分来表示）。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/time.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span></span></span><br><span class="line"><span class="function"><span class="title">maketimeout</span><span class="params">(struct timespec *tsp, <span class="keyword">long</span> minutes)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">timeval</span> <span class="title">now</span>;</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* get the current time */</span></span><br><span class="line">    gettimeofday(&amp;now, <span class="literal">NULL</span>);</span><br><span class="line">    tsp-&gt;tv_sec = now.tv_sec;</span><br><span class="line">    tsp-&gt;tv_nsec = now.tv_usec * <span class="number">1000</span>; <span class="comment">/* usec to nsec */</span></span><br><span class="line">    <span class="comment">/* add the offset to get timeout value */</span></span><br><span class="line">    tsp-&gt;tv_sec += minutes * <span class="number">60</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果超时后条件还没有出现，pthread_cond_timewait将重新获取互斥量，然后返回错误ETIMEDOUT。从pthread_cond_wait或phtread_cond_timedwait调用成功返回是，线程需要检查条件，因为另一个线程可能已经在运行并改变了条件。</p>
+<p>有两个函数可以用户通知线程条件以满足。pthread_cond_signal函数至少能唤醒一个等待该条件的线程。而pthread_cond_broadcast函数则能够唤醒等待该条件的所有线程。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_cond_signal</span><span class="params">(<span class="keyword">pthread_cond_t</span> *cond)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_cond_broadcast</span><span class="params">(<span class="keyword">pthread_cond_t</span> *cond)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>在调用pthread_cond_signal或者pthread_cond_broadcast时，表示在给线程或者条件<strong>发信号</strong>。必须注意，<strong>一定要在改变条件状态以后在给线程发信号</strong>。</p>
+<h3 id="实例-3"><a href="#实例-3" class="headerlink" title="实例"></a>实例</h3><p>下面给出了如何使用条件变量和互斥量对线程进行同步：</p>
+<details>
+    <summary>>使用条件变量</summary>
+<pre><code>#include &ltpthread.h&gt
+&nbsp
+struct msg &#123;
+    struct msg *m_next;
+    /* ...more stuff here ... */
+&#125;;
+&nbsp
+struct msg *workq;
+&nbsp
+pthread_cond_t qready = PTHREAD_COND_INITIALIZER;
+&nbsp
+pthread_mutex_t qlock = PTHREAD_MUTEX_INITIALIZER;
+&nbsp
+void
+process_msg(void)
+&#123;
+    struct msg *mp;
+&nbsp
+    for (;;) &#123;
+        /* 在使用条件变量前，先使用互斥量qlock锁住 */
+        pthread_mutex_lock(&qlock);
+        /* 当工作链表为NULL则等待 */
+        while (workq == NULL) /*若当线程醒来后，发现队列仍为空，可以继续等待 */
+            pthread_cond_wait(&qready, &qlock);
+        mp = workq;
+        workq = mp->m_next;
+        pthread_mutex_unlock(&qlock);
+        /* now process the message mp */
+    &#125;
+&#125;
+&nbsp
+void 
+enqueue_msg(struct msg *mp)
+&#123;
+    pthread_mutex_lock(&qlock);
+    mp->m_next = workq;
+    workq = mp;
+    pthread_mutex_unlock(&qlock);
+    /* 在给等待线程发信号时，不需要占有互斥量 */
+    pthread_cond_signal(&qready);
+&#125;
+</code></pre>
+</details>
+
+<h2 id="自旋锁"><a href="#自旋锁" class="headerlink" title="自旋锁"></a>自旋锁</h2><p>自旋锁与互斥量类似，但它不是通过休眠使线程阻塞，而是在获取锁之前一直处于忙等（自旋）阻塞状态。适用于：锁被持有的时间短，而且线程不希望在重新调度上花费太多的成本。</p>
+<p>自旋锁通常作为底层原语用于实现其他类型的锁。</p>
+<p>在用户层，自旋锁并不非常有用。运行在分时调度中的用户线程在两种情况下会被取消调度：1. 当它们的时间片到期；2. 具有更优先级的线程就绪变成可运行状态。在这些情况下，拥有自旋锁的线程会进入休眠状态，阻塞在锁上的其他线程自旋的时间可能比预期的时间要长。</p>
+<p>互斥量的实现十分高效，以至于应用程序采用互斥锁的性能与自旋锁相当。事实上，有些互斥量的实现在试图获取互斥量的时候会自旋一段时间，只有在自旋计数到达某一阈值时才会休眠。这些因素，加上现代处理器的进步，使得上下文切换越来越快，也使得自旋锁只在某些特定的情况下有用。</p>
+<p>自旋锁与互斥锁的借口类似。可以使用pthread_spin_init函数初始化自旋锁。使用pthread_spin_destroy函数对自旋锁去初始化。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_spin_init</span><span class="params">(<span class="keyword">pthread_spinlock_t</span> *lock, <span class="keyword">int</span> pshared)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_spin_destroy</span><span class="params">(<span class="keyword">pthread_spinlock_t</span> *lock)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>pshared参数表示进程共享属性，表示自旋锁是如何获取的。 如果它设置为 PTHREAD_PROCESS_SHARED，那么可以访问自旋锁底层内存的线程可以获得自旋锁，即使这些线程来自不同的进程。若pshared 参数设置为 PTHREAD_PROCESS_PRIVATE 并且只能从初始化它的进程中的线程访问自旋锁。</p>
+<p>可以使用pthread_spin_lock或pthread_spin_trylock对自旋锁进行加锁，前者获取锁之前一直自旋，后者如果不能获取锁，就立即返回EBUSY错误。注意，pthread_spin_trylock不能自旋。不管以何种方式加锁，自旋锁都可以调用pthread_spin_unlock函数解锁。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_spin_lock</span><span class="params">(<span class="keyword">pthread_spinlock_t</span> *lock)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_spin_trylock</span><span class="params">(<span class="keyword">pthread_spinlock_t</span> *lock)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_spin_unlock</span><span class="params">(<span class="keyword">pthread_spinlock_t</span> *lock)</span></span>;</span><br><span class="line">								所有函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>注意，如果自旋锁当前在解锁状态时，pthread_spin_lock函数不需要自旋就可以对它加锁。如果线程已经对其加锁，则结果未定义。调用pthread_spin_lock会返回EDEADLK错误（或其他错误），或者调用可能永久自旋，这取决于具体实现。试图对未加锁的自旋锁解锁，结果也是未定义。</p>
+<p>需要注意，不要调用在持有自旋锁的情况下可能会进入休眠状态的函数，如果调用了这些函数，会浪费CPU资源，因为其他线程需要获取自旋锁需要等待的时间就延长了。</p>
+<h2 id="屏障"><a href="#屏障" class="headerlink" title="屏障"></a>屏障</h2><p>屏障（barrier）是用户协调多个线程并行工作的同步机制。屏障允许多个线程等待，直到所有的合作线程都达到某一点，然后从该点继续执行。我们已经看到一种屏障，pthread_join函数就是一种屏障，允许一个线程等待，直到另一个线程退出。</p>
+<p>但屏障的概念更广，它允许任意数量的线程等待，直到所有线程完成处理工作，而线程不需要退出。所有线程到达屏障后可接着工作。</p>
+<p>可以使用pthread_barrier_init函数对屏障进行初始化，用pthread_barrier_destroy函数去初始化屏障。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;phtread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_barrier_init</span><span class="params">(<span class="keyword">pthread_barrier_t</span> *<span class="keyword">restrict</span> barrier,</span></span></span><br><span class="line"><span class="params"><span class="function">                       	 <span class="keyword">const</span> <span class="keyword">phtread_barrierattr_t</span> *restrcit attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                         <span class="keyword">unsigned</span> <span class="keyword">int</span> count)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_barrier_destroy</span><span class="params">(<span class="keyword">pthread_barrier_t</span> *barrier)</span></span>;</span><br><span class="line">								两个函数的返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>参数count指定必须到达屏障的线程数目，参数attr指定屏障对象的属性。</p>
+<p>pthread_barrier_wait函数表明，线程已完成工作，准备等待所有其他线程赶上来。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_barrier_wait</span><span class="params">(<span class="keyword">pthread_barrier_t</span> *barrier)</span></span>;</span><br><span class="line"></span><br><span class="line">								返回值：若成功，返回<span class="number">0</span>或者PTHREAD_BARRIER_SERIAL_THREAD；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>调用pthread_barrier_wait的线程在屏障计数（phtread_barrier_init中的count参数）为满足条件时，会进入休眠状态。如果该线程是最后一个调用pthread_barrier_wait的线程，就满足了屏障计数，则所有线程会被唤醒。</p>
+<p>对于一个任意线程，pthread_barrier_wait函数返回了PTHREAD_BARRIER_SERIAL_THREAD，剩下的其他线程看到的返回值为0.这使得一个线程可以作为主线程对所有其他线程完成的工作的结果进行操作。</p>
+<p>一旦达到屏障计数值，而且线程处于非阻塞状态，屏障就可以被重用。除非是调用了pthread_barrier_destroy后，又调用了pthread_barrier_init函数对计数用另外的值进行初始化。否则屏障计数不会改变。</p>
+<h3 id="实例-4"><a href="#实例-4" class="headerlink" title="实例"></a>实例</h3><p>使用8个线程来对800万数字进行排序工作，每个线程用堆排序算法堆100万个数进行排序，然后主线程调用merge函数对结果进行合并。</p>
+<p>这里并不需要使用PHTREAD_BARRIER_SERIAL_THREAD来决定哪个线程执行合并操作，这由主线程完成，这也是把屏障值设为工作线程加1的原因，主线程也是其中一个候选线程。</p>
+<p>在单线程程序中，耗时12.14秒。在8核处理器系统上，8个线程并行和1个线程合并，相同的数字耗时只要1.91秒，速度提升了6倍。</p>
+<p>在我的Linux系统中，耗时为2.6秒</p>
+<details>
+    <summary>>使用屏障</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+#include &ltlimits.h&gt
+#include &ltsys/time.h&gt
+&nbsp
+#define NTHR    8               /* number of threads */
+#define NUMNUM  8000000L        /* number of numbers to sort */
+#define TNUM    (NUMNUM/NTHR)   /* number to sort per thread */
+&nbsp
+long nums[NUMNUM];
+long snums[NUMNUM];
+&nbsp
+pthread_barrier_t b;
+&nbsp
+#ifdef SOLARIS
+#define heapsort qsort
+#else
+extern int heapsort(void *, size_t, size_t, int (*)(const void *, const void *));
+#endif
+&nbsp
+/* 
+ * Compare two long integers (helper function for heapsort)
+ */
+int
+complong(const void *arg1, const void *arg2)
+&#123;
+    long l1 = *(long *)arg1;
+    long l2 = *(long *)arg2;
+&nbsp
+    if (l1 == l2)
+        return 0;
+    else if (l1 < l2)
+        return -1;
+    else
+        return 1;
+&#125;
+&nbsp
+/*
+ * Worker thread to sort a portion of the set of numbers
+ */
+void *
+thr_fn(void *arg)
+&#123;
+    long idx = (long)arg;
+&nbsp
+    heapsort(&nums[idx], TNUM, sizeof(long), complong);
+    pthread_barrier_wait(&b);
+&nbsp
+    /*
+     * Go off and perform more work ...
+     */
+    return ((void *)0);
+&#125;
+&nbsp
+/* 
+ * Merge the results of the individual sorted ranges
+ */
+ void
+ merge()
+ &#123;
+    long    idx[NTHR];
+    long    i, minidx, sidx, num;
+ &nbsp
+    for (i = 0; i < NTHR; i++)
+        idx[i] = i * TNUM;
+    for (sidx = 0; sidx < NUMNUM; sidx++) &#123;
+        num = LONG_MAX;
+        /* 对各线程负责的数组范围内，比较第一个值并找出最小值 */
+        for (i = 0; i < NTHR; i++) &#123;
+            if ((idx[i] < (i + 1) * TNUM) && (nums[idx[i]] < num)) &#123;
+                num = nums[idx[i]];
+                minidx = i;
+            &#125;
+        &#125;
+        /* 将最小值赋值给snums，并对相应的线程索引+1 */
+        snums[sidx] = nums[idx[minidx]];
+        idx[minidx]++;
+    &#125;
+ &#125;
+ &nbsp
+ int
+ main()
+ &#123;
+    unsigned long       i;
+    struct timeval      start, end;
+    long long           startusec, endusec;
+    double              elapsed;
+    int                 err;
+    pthread_t           tid;
+ &nbsp
+    /* 
+     * Create the initial set of numbers to sort.
+     */
+     srandom(1);
+     for (i = 0; i < NUMNUM; i++)
+        nums[i] = random();
+  &nbsp 
+     /*
+     * Create 8 threads to sort the numbers.
+     */
+     gettimeofday(&start, NULL);
+     pthread_barrier_init(&b, NULL, NTHR + 1);
+     for (i = 0; i < NTHR; i++) &#123;
+         /* 创建线程来执行相应范围的数字排序 */
+        err = pthread_create(&tid, NULL, thr_fn, (void *)(i * TNUM));
+        if (err != 0)
+            err_exit(err, "can't create thread");
+     &#125;
+     /* 主线程和其他线程等待所有线程完成排序工作 */
+     pthread_barrier_wait(&b);
+     merge();
+     gettimeofday(&end, NULL);
+  &nbsp
+     /* 
+     * Print the sorted list.
+     */
+     startusec = start.tv_sec * 1000000 + start.tv_usec;
+     endusec = end.tv_sec * 1000000 + end.tv_usec;
+     elapsed = (double)(endusec - startusec) / 1000000.0;
+     printf("sort took %.4f seconds \n", elapsed);
+     for (i = 0; i < NUMNUM; i++)
+        printf("%ld\n", snums[i]);
+     exit(0);
+  &#125;
+  </code></pre>
+  </details>
+
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>本章介绍了线程的概念，介绍了5个线程同步机制：互斥量、读写锁、条件变量、自旋锁、屏障。</p>
+<h1 id="习题"><a href="#习题" class="headerlink" title="习题"></a>习题</h1><p>这部分是对APUE书本上的习题进行解答</p>
+<h3 id="11-1"><a href="#11-1" class="headerlink" title="11.1"></a>11.1</h3><p><strong>修改图11-4所示的实例代码，正确地在两个线程之间传递结构。</strong></p>
+<p>11-4的实例代码如下：</p>
+<details>
+    <summary>>11-4 pthread_exit参数的不正确使用</summary>
+<pre><code>#include "apue.h"
+#include &ltpthread.h&gt
+&nbsp
+struct foo &#123;
+    int a, b, c, d;
+&#125;;
+&nbsp
+void
+printfoo(const char *s, const struct foo *fp)
+&#123;
+    printf("%s", s);
+    printf("  structure at 0x%lx\n", (unsigned long)fp);
+    printf("  foo.a = %d\n", fp->a);
+    printf("  foo.b = %d\n", fp->b);
+    printf("  foo.c = %d\n", fp->c);
+    printf("  foo.d = %d\n", fp->d);
+&#125;
+&nbsp
+void *
+thr_fn1(void *arg)
+&#123;
+    struct foo    foo = &#123;1, 2, 3, 4&#125;;
+&nbsp
+    printfoo("thread 1:\n", &foo);
+    pthread_exit((void *)&foo);
+&#125;
+&nbsp
+void *
+thr_fn2(void *arg)
+&#123;
+    printf("thread 2: ID is %lu\n", (unsigned long)pthread_self());
+    pthread_exit((void *)0);
+&#125;
+&nbsp
+int
+main(void)
+&#123;
+    int            err;
+    pthread_t    tid1, tid2;
+    struct foo    *fp;
+&nbsp
+    err = pthread_create(&tid1, NULL, thr_fn1, NULL);
+    if (err != 0)
+        err_exit(err, "can't create thread 1");
+    err = pthread_join(tid1, (void *)&fp);
+    if (err != 0)
+        err_exit(err, "can't join with thread 1");
+    sleep(1);
+    printf("parent starting second thread\n");
+    err = pthread_create(&tid2, NULL, thr_fn2, NULL);
+    if (err != 0)
+        err_exit(err, "can't create thread 2");
+    sleep(1);
+    printfoo("parent:\n", fp);
+    exit(0);
+&#125;
+</code>
+<pre>
+</details>
+这段代码的问题是：在thr_fn1函数中，结构struct foo是在栈上创建，当函数返回后，局部变量就会被释放，因此struct foo对应的内存会被改写（可能会被后续线程2改写），导致在主线程中获取到的struct foo的值错误。
+
+<p>可以把struct foo以动态内存分配的方式创建内存。即：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> *<span class="title">thr_fn1</span><span class="params">(<span class="keyword">void</span> *arg)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">foo</span> *<span class="title">fp</span>;</span></span><br><span class="line">    <span class="keyword">if</span> ((fp = <span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(struct foo))) == <span class="literal">NULL</span>)</span><br><span class="line">        err_sys(<span class="string">&quot;can&#x27;t allocate memory&quot;</span>);</span><br><span class="line">   	fp-&gt;a = <span class="number">1</span>;</span><br><span class="line">    fp-&gt;b = <span class="number">2</span>;</span><br><span class="line">    fp-&gt;c = <span class="number">3</span>;</span><br><span class="line">    fp-&gt;d = <span class="number">4</span>;</span><br><span class="line">    </span><br><span class="line">    printffoo(<span class="string">&quot;thread 1:\n&quot;</span>, fp);</span><br><span class="line">    pthread_exit((<span class="keyword">void</span> *)fp);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="11-2"><a href="#11-2" class="headerlink" title="11.2"></a>11.2</h3><p><strong>在图11-14所示的实例代码中，需要另外添加什么同步（如果需要的话）可以使得主线程改变与挂起作业关联的线程ID？这会对job_remove函数产生什么影响？</strong></p>
+<p>11-14的代码如下：</p>
+<details>
+    <summary>>使用读写锁</summary>
+<pre><code>#include &ltstdlib.h&gt
+#include &ltpthread.h&gt
+&nbsp
+struct job &#123;
+    struct job *j_next;
+    struct job *j_prev;
+    pthread_t   j_id;   /* tells which thread handles this job */
+    /* ... more stuff here ... */
+&#125;;
+&nbsp
+struct queue &#123;
+    struct job      *q_head;
+    struct job      *q_tail;
+    pthread_rwlock_t q_lock;
+&#125;;
+&nbsp
+/*
+ * Initialize a queue.
+ */
+int
+queue_init(struct queue *qp)
+&#123;
+    int err;
+&nbsp
+    qp->q_head = NULL;
+    qp->q_tail = NULL;
+    err = pthread_rwlock_init(&qp->q_lock, NULL);
+    if (err != 0)
+        return(err);
+    /* ... continue initialization ... */
+    return(0);
+&#125;
+&nbsp
+/*
+ * Insert a job at the head of the queue.
+ */
+void
+job_insert(struct queue *qp, struct job *jp)
+&#123;
+    pthread_rwlock_wrlock(&qp->q_lock);
+    jp->j_next = qp->q_head;
+    jp->j_prev = NULL;
+    if (qp->q_head != NULL)
+        qp->q_head->j_prev = jp;
+    else
+        qp->q_tail = jp;    /* list was empty */
+    qp->q_head = jp;
+    pthread_rwlock_unlock(&qp->q_lock);
+&#125;
+&nbsp
+/*
+ * Append a job on the tail of the queue.
+ */
+void
+job_append(struct queue *qp, struct job *jp)
+&#123;
+    pthread_rwlock_wrlock(&qp->q_lock);
+    jp->j_next = NULL;
+    jp->j_prev = qp->q_tail;
+    if (qp->q_tail != NULL)
+        qp->q_tail->j_next = jp;
+    else
+        qp->q_head = jp;    /* list was empty */
+    qp->q_tail = jp;
+    pthread_rwlock_unlock(&qp->q_lock);
+&#125;
+&nbsp
+/*
+ * Remove the given job from a queue.
+ */
+void
+job_remove(struct queue *qp, struct job *jp)
+&#123;
+    pthread_rwlock_wrlock(&qp->q_lock);
+    if (jp == qp->q_head) &#123;
+        qp->q_head = jp->j_next;
+        if (qp->q_tail == jp)
+            qp->q_tail = NULL;
+        else
+            jp->j_next->j_prev = jp->j_prev;
+    &#125; else if (jp == qp->q_tail) &#123;
+        qp->q_tail = jp->j_prev;
+        jp->j_prev->j_next = jp->j_next;
+    &#125; else &#123;
+        jp->j_prev->j_next = jp->j_next;
+        jp->j_next->j_prev = jp->j_prev;
+    &#125;
+    pthread_rwlock_unlock(&qp->q_lock);
+&#125;
+&nbsp
+/*
+ * Find a job for the given thread ID.
+ */
+struct job *
+job_find(struct queue *qp, pthread_t id)
+&#123;
+    struct job *jp;
+&nbsp
+    if (pthread_rwlock_rdlock(&qp->q_lock) != 0)
+        return(NULL);
+&nbsp
+    for (jp = qp->q_head; jp != NULL; jp = jp->j_next)
+        if (pthread_equal(jp->j_id, id))
+            break;
+&nbsp
+    pthread_rwlock_unlock(&qp->q_lock);
+    return(jp);
+&#125;
+</code></pre>
+</details>
+要改变挂起作业的线程ID，主线程必须持有写模式下的读写锁，防止在改变ID过程中有其他线程搜索该列表。
+
+<p>此时存在的问题：在job_find和job_remove之间的时间内可以改动作业ID，这会引起一个作业通过线程ID被找到并分配给了线程1，但在remove之前，这个job中的线程ID被改变成线程2。这个问题可以通过在job结构中增加引用计数和互斥量，然后find中增加引用计数的方式解决，当该引用计数不为0时，主线程不得更改该job的线程ID。</p>
 
       
 
@@ -1062,7 +1598,7 @@ can't lock mutex again: Connection timed out
                 </span>
                 <span class="tooltip-content">
                     <div class="toc-article">
-                    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A6%82%E5%BF%B5"><span class="toc-number">1.</span> <span class="toc-text">线程概念</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A0%87%E8%AF%86"><span class="toc-number">2.</span> <span class="toc-text">线程标识</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%88%9B%E5%BB%BA"><span class="toc-number">3.</span> <span class="toc-text">线程创建</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E7%BB%88%E6%AD%A2"><span class="toc-number">4.</span> <span class="toc-text">线程终止</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E8%A6%86%E5%86%99"><span class="toc-number">4.1.</span> <span class="toc-text">内存覆写</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%90%8C%E6%AD%A5"><span class="toc-number">5.</span> <span class="toc-text">线程同步</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%94%81"><span class="toc-number">5.1.</span> <span class="toc-text">锁</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%92%E6%96%A5%E9%87%8F"><span class="toc-number">5.2.</span> <span class="toc-text">互斥量</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B"><span class="toc-number">5.2.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%81%BF%E5%85%8D%E6%AD%BB%E9%94%81"><span class="toc-number">5.3.</span> <span class="toc-text">避免死锁</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B-1"><span class="toc-number">5.3.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%BD%E6%95%B0pthread-mutex-timedlock"><span class="toc-number">5.4.</span> <span class="toc-text">函数pthread_mutex_timedlock</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B-2"><span class="toc-number">5.4.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%BB%E5%86%99%E9%94%81"><span class="toc-number">5.5.</span> <span class="toc-text">读写锁</span></a></li></ol></li></ol>
+                    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A6%82%E5%BF%B5"><span class="toc-number">1.</span> <span class="toc-text">线程概念</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E6%A0%87%E8%AF%86"><span class="toc-number">2.</span> <span class="toc-text">线程标识</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%88%9B%E5%BB%BA"><span class="toc-number">3.</span> <span class="toc-text">线程创建</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E7%BB%88%E6%AD%A2"><span class="toc-number">4.</span> <span class="toc-text">线程终止</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E8%A6%86%E5%86%99"><span class="toc-number">4.1.</span> <span class="toc-text">内存覆写</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BA%BF%E7%A8%8B%E5%90%8C%E6%AD%A5"><span class="toc-number">5.</span> <span class="toc-text">线程同步</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%94%81"><span class="toc-number">5.1.</span> <span class="toc-text">锁</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%92%E6%96%A5%E9%87%8F"><span class="toc-number">5.2.</span> <span class="toc-text">互斥量</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B"><span class="toc-number">5.2.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%81%BF%E5%85%8D%E6%AD%BB%E9%94%81"><span class="toc-number">5.3.</span> <span class="toc-text">避免死锁</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B-1"><span class="toc-number">5.3.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%BD%E6%95%B0pthread-mutex-timedlock"><span class="toc-number">5.4.</span> <span class="toc-text">函数pthread_mutex_timedlock</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B-2"><span class="toc-number">5.4.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%BB%E5%86%99%E9%94%81"><span class="toc-number">5.5.</span> <span class="toc-text">读写锁</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%AF%BB%E5%86%99%E9%94%81%E7%9A%84%E4%BD%BF%E7%94%A8"><span class="toc-number">5.5.1.</span> <span class="toc-text">读写锁的使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B8%A6%E6%9C%89%E8%B6%85%E6%97%B6%E7%9A%84%E8%AF%BB%E5%86%99%E9%94%81"><span class="toc-number">5.5.2.</span> <span class="toc-text">带有超时的读写锁</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9D%A1%E4%BB%B6%E5%8F%98%E9%87%8F"><span class="toc-number">5.6.</span> <span class="toc-text">条件变量</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B-3"><span class="toc-number">5.6.1.</span> <span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%87%AA%E6%97%8B%E9%94%81"><span class="toc-number">5.7.</span> <span class="toc-text">自旋锁</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B1%8F%E9%9A%9C"><span class="toc-number">5.8.</span> <span class="toc-text">屏障</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E4%BE%8B-4"><span class="toc-number">5.8.1.</span> <span class="toc-text">实例</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%B0%8F%E7%BB%93"><span class="toc-number">6.</span> <span class="toc-text">小结</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B9%A0%E9%A2%98"><span class="toc-number">7.</span> <span class="toc-text">习题</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#11-1"><span class="toc-number">7.0.1.</span> <span class="toc-text">11.1</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-2"><span class="toc-number">7.0.2.</span> <span class="toc-text">11.2</span></a></li></ol></li></ol></li></ol>
                     </div>
                 </span>
             </div>
