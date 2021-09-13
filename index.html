@@ -175,7 +175,37 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        
+        <h1 id="引言"><a href="#引言" class="headerlink" title="引言"></a>引言</h1><p>本章主要介绍线程属性、同步原语属性、同一进程中的多个线程之间如何保持数据私有性、进程如何与线程进行交互。</p>
+<h1 id="线程限制"><a href="#线程限制" class="headerlink" title="线程限制"></a>线程限制</h1><table>
+<thead>
+<tr>
+<th>限制名称</th>
+<th>描述</th>
+<th>name参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PTHREAD_DESTRUCTOR_ITERATIONS</td>
+<td>线程退出时尝试销毁线程特定数据的最大次数</td>
+<td>_SC_THREAD_DESTRUCTOR_ITERATIONS</td>
+</tr>
+<tr>
+<td>PTHREAD_KEYS_MAX</td>
+<td>进程可以创建的键的最大数目</td>
+<td>_SC_THREAD_KEYS_MAX</td>
+</tr>
+<tr>
+<td>PTHREAD_STACK_MIN</td>
+<td>一个线程栈可用的最小字节数</td>
+<td>_SC_THREAD_STACK_MIN</td>
+</tr>
+<tr>
+<td>PTHREAD_THREADS_MAX</td>
+<td>进程可以创建的最大线程数</td>
+<td>_SC_THREAD_THREADS_MAX</td>
+</tr>
+</tbody></table>
+
       
 
       
