@@ -176,7 +176,8 @@
     <div class="article-entry" itemprop="articleBody">
       
         <h1 id="引言"><a href="#引言" class="headerlink" title="引言"></a>引言</h1><p>本章主要介绍线程属性、同步原语属性、同一进程中的多个线程之间如何保持数据私有性、进程如何与线程进行交互。</p>
-<h1 id="线程限制"><a href="#线程限制" class="headerlink" title="线程限制"></a>线程限制</h1><table>
+<h1 id="线程限制"><a href="#线程限制" class="headerlink" title="线程限制"></a>线程限制</h1><p>下面是线程相关的一些限制：</p>
+<table>
 <thead>
 <tr>
 <th>限制名称</th>
@@ -205,7 +206,79 @@
 <td>_SC_THREAD_THREADS_MAX</td>
 </tr>
 </tbody></table>
+<p>下面描述了4种操作系统实现中线程限制的值，其中“没有确定限制”并不意味着值是无限的：</p>
+<table>
+<thead>
+<tr>
+<th>限制名称</th>
+<th>FreeBSD 8.0</th>
+<th>Linux 3.2.0</th>
+<th>Mac OS X 10.6.8</th>
+<th>Solaris 10</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PTHREAD_DESTRUCTOR_ITERATIONS</td>
+<td>4</td>
+<td>4</td>
+<td>4</td>
+<td>没有确定限制</td>
+</tr>
+<tr>
+<td>PTHREAD_KEYS_MAX</td>
+<td>256</td>
+<td>1024</td>
+<td>512</td>
+<td>没有确定限制</td>
+</tr>
+<tr>
+<td>PTHREAD_STACK_MIN</td>
+<td>2048</td>
+<td>16384</td>
+<td>8192</td>
+<td>8192</td>
+</tr>
+<tr>
+<td>PTHREAD_THREADS_MAX</td>
+<td>没有确定限制</td>
+<td>没有确定限制</td>
+<td>没有确定限制</td>
+<td>没有确定限制</td>
+</tr>
+</tbody></table>
+<h1 id="线程属性"><a href="#线程属性" class="headerlink" title="线程属性"></a>线程属性</h1><p>pthread接口允许我们通过关联的不同属性来细调线程和同步对象的行为。管理这些属性的行为有：</p>
+<ol>
+<li>每个对象与它自己类型的属性对象进行关联（比如线程与线程属性关联，互斥量和互斥量属性关联），一个属性对象可以代表多个属性；</li>
+<li>有一个初始化函数，把属性设置为默认值；</li>
+<li>有一个销毁属性对象函数，销毁初始化函数分配的资源；</li>
+<li>每个属性都有一个从属性对象中获取属性值的函数；</li>
+<li>每个属性都有一个设置属性值的函数，属性值作为参数按值传递。</li>
+</ol>
+<p>在pthread_create函数中，有一个参数是pthread_attr_t，它可以修改线程默认属性。可以使用pthread_attr_init初始化pthread_attr_t结构。在调用pthread_attr_init后，pthread_attr_t结构所包含的就是操作系统实现支持的所有线程属性的默认值。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_init</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_destroy</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
 
+<p>pthread_attr_init初始化的属性对象是动态分配的，所以需要pthread_attr_destroy来释放这些内存空间。</p>
+<p><strong>分离线程</strong>：如果在创建线程时就知道不需要了解线程的终止状态，就可以修改pthread_attr_t 结构中detachstate线程属性，让线程一开始就处于分离状态。detachstate具有两个合法值：PTHREAD_CREATE_DETACHED——以分离状态启动线程、PTHREAD_CREATE_JOINABLE——正常启动线程，应用程序可以获取线程的终止状态。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* 获取当前的 detachstate 线程属性 */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_getdetachstate</span><span class="params">(<span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                                <span class="keyword">int</span> *detachstate)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_setdetachstate</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr, <span class="keyword">int</span> *detachstate)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+
+
+<p>线程栈，即为线程分配的栈。可以使用pthread_attr_getstack和pthread_attr_setstack对线程栈属性进行管理。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_getstack</span><span class="params">(<span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                          <span class="keyword">void</span> **<span class="keyword">restrict</span> stackaddr,</span></span></span><br><span class="line"><span class="params"><span class="function">                          <span class="keyword">size_t</span> *<span class="keyword">restrict</span> stacksize)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_setstack</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr,</span></span></span><br><span class="line"><span class="params"><span class="function">					      <span class="keyword">void</span> *stackaddr, <span class="keyword">size_t</span> stacksize)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>对于线程，虚地址空间的大小是固定的。但对于线程，同样大小的虚地址空间必须被所有的线程共享。如果使用许多线程，则这些线程栈累计大小就超过了可用的虚地址空间，就需要减少默认的线程栈大小。如果线程的函数分配了大量的自动变量，或调用函数设计很深的栈，则需要的栈比默认的大。</p>
+<p>如果线程栈的虚地址空间消耗完了，则需要使用malloc或mmap来为可替代栈跟配空间，并用pthread_attr_setstack函数来改变新建线程的栈位置。stackattr参数指向线程栈的最低可寻址地址，该地址与边界地址对齐。当然，stackattr不一定是站的开始地址，如果一个处理器栈从高地址向低地址增长，那么stackaddr是线程栈的结尾位置。</p>
+<p>应用程序可以通过pthread_attr_getstacksize和pthread_attr_setstacksize读取或设置线程属性stacksize。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_getstacksize</span><span class="params">(<span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                              <span class="keyword">size_t</span> *<span class="keyword">restrict</span> stacksize)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_setstacksize</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr, <span class="keyword">size_t</span> stacksize)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>其中，设置stacksize时其大小不能小于PTHREAD_STACK_MIN。</p>
+<p>线程属性guardsize控制线程末尾用以避免栈溢出的扩展内存大小，默认值由具体实现决定，一般为系统页大小。将guardsize设置为0，则不会提供警戒缓冲区。如果程序修改了线程属性stackaddr，则系统认为由我们自己管理栈，栈警戒缓冲区机制无效，等同于将guardsize设置为0。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_getguardsize</span><span class="params">(<span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                              <span class="keyword">size_t</span> *<span class="keyword">restrict</span> guardsize)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_setguartdsize</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr, <span class="keyword">size_t</span> guardsize)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+
+<p>如果guardsize被修改，操作系统可能把它取为页大小的整数倍。如果线程的栈指针溢出至警戒区域，应用程序就可能通过信号接收到出错信息。</p>
+        
+          <a class="article-more-a" href="/2021/09/13/APUE-%E7%AC%AC12%E7%AB%A0-%E7%BA%BF%E7%A8%8B%E6%8E%A7%E5%88%B6/#more">more >></a>
+        
       
 
       
@@ -575,15 +648,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
           <ul class="article-tag-list" q-show="showTags">
              
               <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color4">Markdown</a>
+              </li>
+             
+              <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color3">线程</a>
               </li>
              
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color5">APUE</a>
-              </li>
-             
-              <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color4">Markdown</a>
               </li>
             
             <div class="clearfix"></div>
