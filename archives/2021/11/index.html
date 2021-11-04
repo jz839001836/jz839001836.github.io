@@ -6,12 +6,12 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://example.com">
-  <title>读书和分享</title>
+  <title>Archives: 2021/11 | 读书和分享</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="读书和分享">
 <meta property="og:type" content="website">
 <meta property="og:title" content="读书和分享">
-<meta property="og:url" content="http://example.com/index.html">
+<meta property="og:url" content="http://example.com/archives/2021/11/index.html">
 <meta property="og:site_name" content="读书和分享">
 <meta property="og:description" content="读书和分享">
 <meta property="og:locale">
@@ -155,499 +155,47 @@
           <div id="js-content" class="content-ll">
             
   
-    <article id="post-APUE-第13章-守护进程" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
+  
     
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/11/03/APUE-%E7%AC%AC13%E7%AB%A0-%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B/">APUE-第13章-守护进程</a>
-    </h1>
-  
-
-        
-        <a href="/2021/11/03/APUE-%E7%AC%AC13%E7%AB%A0-%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B/" class="archive-article-date">
+    
+      
+      
+      <section class="archives-wrap">
+        <div class="archive-year-wrap">
+          <a href="/archives/2021" class="archive-year">2021</a>
+        </div>
+        <div class="archives">
+    
+    <article class="archive-article archive-type-post">
+  <div class="archive-article-inner">
+    <header class="archive-article-header">
+      	<div class="article-meta">
+	      	<a href="/2021/11/03/APUE-%E7%AC%AC13%E7%AB%A0-%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B/" class="archive-article-date">
   	<time datetime="2021-11-03T14:10:59.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2021-11-03</time>
 </a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="守护进程的特征"><a href="#守护进程的特征" class="headerlink" title="守护进程的特征"></a>守护进程的特征</h1><p>什么是守护进程？</p>
-<p>守护进程通常在系统引导时启动，系统关闭时终止。它们不控制终端，在后台运行。</p>
-<p>在我的Linux系统中输入：ps -axj，输出了以下参数：</p>
-<p><img src="/images/Linux_daemon.PNG" alt="Linux下的ps输出"></p>
-<p>其中，PPID—父进程ID、PID—进程ID、PGID—进程组ID、SID—会话ID、UID—用户ID、TTY—终端名称、COMMAND—命令字符串。</p>
-<p>父进程ID为0的进程是内核进程，内核进程存在于系统的整个生命期中，以超级用户特权运行，无命令行。</p>
-<p>内核守护进程名字用[]中，Linux通过名为kthreadd的内核进程来创建其他内核进程，因此该进程是其他内核进程的父进程。在这些进程中，如：</p>
-<ul>
-<li>kswapd：称为内存换页守护进程，支持虚拟子系统将脏页面写回磁盘来回收页面。</li>
-<li>flush：称为冲洗守护进程。在可用内存达到设置的最小阈值时，将脏页面冲洗到磁盘中。他也会定期清洗脏页面，从而减少系统故障时的数据丢失。</li>
-<li>sync_supers：定期将文件系统元数据冲洗至磁盘。</li>
-</ul>
-<p>大多数守护进程都以超级用户root特权运行（即UID是0），所有守护进程没有控制终端，TTY都是？。内核守护进程以无控制终端方式启动，用户层守护进程不控制终端可能是调用了setsid的结果。用户层守护进程的父进程都是init进程。</p>
-<h1 id="创建守护进程"><a href="#创建守护进程" class="headerlink" title="创建守护进程"></a>创建守护进程</h1><p>创建守护进程的编程规则：</p>
-<ol>
-<li>调用umask将文件模式创建屏蔽字设置为已知值（一般为0）；</li>
-<li>调用fork，父进程exit。保证进程不是一个进程组组长，这是setsid调用的先决条件；</li>
-<li>调用setsid创建新会话，使调用进程：（1）成为会话首进程，（2）成为新进程组的组长，（3）不控制终端；</li>
-<li>将当前工作页面更改为根目录；</li>
-<li>关闭不需要的文件描述符；</li>
-<li>打开文件描述符0、1、2，使任何读标准输入、标准输出、标准错误的库例程不产生效果。</li>
-</ol>
-<p>下面是一个守护进程的初始化函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&quot;apue.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;syslog.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/resource.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span></span></span><br><span class="line"><span class="function"><span class="title">daemonize</span><span class="params">(<span class="keyword">const</span> <span class="keyword">char</span> *cmd)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">int</span>                 i, fd0, fd1, fd2;</span><br><span class="line">    <span class="keyword">pid_t</span>               pid;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">rlimit</span>       <span class="title">r1</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sigaction</span>    <span class="title">sa</span>;</span></span><br><span class="line">	</span><br><span class="line">    <span class="comment">//设置屏蔽字</span></span><br><span class="line">    umask(<span class="number">0</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//获取最大的文件描述符</span></span><br><span class="line">    <span class="keyword">if</span> (getrlimit(RLIMIT_NOFILE, &amp;r1) &lt; <span class="number">0</span>)</span><br><span class="line">        err_quit(<span class="string">&quot;%s: can&#x27;t get file limit&quot;</span>, cmd);</span><br><span class="line">    </span><br><span class="line">	<span class="comment">//子进程通过调用setsid创建新会话</span></span><br><span class="line">    <span class="keyword">if</span> ((pid = fork()) &lt; <span class="number">0</span>)</span><br><span class="line">        err_quit(<span class="string">&quot;%s: can&#x27;t fork&quot;</span>, cmd);</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (pid != <span class="number">0</span>)</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">    setsid();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*</span></span><br><span class="line"><span class="comment">     * Ensure future opens won&#x27;t allocate controlling TTYs.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    sa.sa_handler = SIG_IGN;    <span class="comment">//忽略信号</span></span><br><span class="line">    sigemptyset(&amp;sa.sa_mask);	<span class="comment">//清楚所有信号</span></span><br><span class="line">    sa.sa_flags = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">if</span> (sigaction(SIGHUP, &amp;sa, <span class="literal">NULL</span>) &lt; <span class="number">0</span>)</span><br><span class="line">        err_quit(<span class="string">&quot;%s: can&#x27;t ignore SIGHUP&quot;</span>, cmd);</span><br><span class="line">    <span class="keyword">if</span> ((pid = fork()) &lt; <span class="number">0</span>)		<span class="comment">//这个fork的进程才是守护进程</span></span><br><span class="line">        err_quit(<span class="string">&quot;%s: can&#x27;t fork&quot;</span>, cmd);</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (pid != <span class="number">0</span>)</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//修改当前工作目录为“/”</span></span><br><span class="line">    <span class="keyword">if</span> (chdir(<span class="string">&quot;/&quot;</span>) &lt; <span class="number">0</span>)</span><br><span class="line">        err_quit(<span class="string">&quot;%s: can&#x27;t change directory to /&quot;</span>, cmd);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//释放所有文件描述符</span></span><br><span class="line">    <span class="keyword">if</span> (r1.rlim_max == RLIM_INFINITY)</span><br><span class="line">        r1.rlim_max = <span class="number">1024</span>;</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; r1.rlim_max; i++)</span><br><span class="line">        close(i);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//获取文件描述符0，1，2，防止库例程试图读取标准输入、标准输出、标准错误，因为守护例程不会和终端交互</span></span><br><span class="line">    fd0 = open(<span class="string">&quot;/dev/null&quot;</span>, O_RDWR);</span><br><span class="line">    fd1 = dup(<span class="number">0</span>);</span><br><span class="line">    fd2 = dup(<span class="number">0</span>);</span><br><span class="line">	</span><br><span class="line">    <span class="comment">//打开日志消息</span></span><br><span class="line">    openlog(cmd, LOG_CONS, LOG_DAEMON);</span><br><span class="line">    <span class="keyword">if</span> (fd0 != <span class="number">0</span> || fd1 != <span class="number">1</span> || fd2 != <span class="number">2</span>) &#123;</span><br><span class="line">        syslog(LOG_ERR, <span class="string">&quot;unexpected file descriptors %d %d %d&quot;</span>, </span><br><span class="line">            fd0, fd1, fd2);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h1 id="单实例守护进程"><a href="#单实例守护进程" class="headerlink" title="单实例守护进程"></a>单实例守护进程</h1><p>有些守护进程，在任一时刻必须只运行该守护进程的一个副本，防止一些操作的重复执行，可能导致出错。</p>
-<p>文件和记录锁可以保证一个守护进程只有一个副本在运行。一个守护进程创建一个文件，并在文件上加了一把写锁，并且只允许创建一把写锁。此后创建写锁的操作均会失败，这告诉后续的守护进程此时已经有一个副本正在运行。在该守护进程终止时，写锁将自动被删除，从而去除了之前守护进程实例进行清理的相关操作。</p>
-<h2 id="实例"><a href="#实例" class="headerlink" title="实例"></a>实例</h2><p>下面是用文件和记录锁来保证只运行一个守护进程的一个副本。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;errno.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/stat.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;syslog.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> LOCKFILE <span class="meta-string">&quot;/var/run/daemon.pid&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> LOCKMODE (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//记录锁</span></span><br><span class="line"><span class="function"><span class="keyword">extern</span> <span class="keyword">int</span> <span class="title">lockfile</span><span class="params">(<span class="keyword">int</span>)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span></span></span><br><span class="line"><span class="function"><span class="title">already_running</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">int</span>     fd;</span><br><span class="line">    <span class="keyword">char</span>    buf[<span class="number">16</span>];</span><br><span class="line">	</span><br><span class="line">    <span class="comment">//以读写的方式打开LOCKFILE文件，没有则创建</span></span><br><span class="line">    fd = open(LOCKFILE, O_RDWR|O_CREAT, LOCKMODE);</span><br><span class="line">    <span class="keyword">if</span> (fd &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">//打开失败</span></span><br><span class="line">        syslog(LOG_ERR, <span class="string">&quot;can&#x27;t open %s: %s&quot;</span>, LOCKFILE, strerror(errno));</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//尝试使用记录锁锁住文件</span></span><br><span class="line">    <span class="keyword">if</span> (lockfile(fd) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (errno == EACCES || errno == EAGAIN) &#123;</span><br><span class="line">            close(fd);</span><br><span class="line">            <span class="keyword">return</span> (<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        syslog(LOG_ERR, <span class="string">&quot;can&#x27;t lock %s: %s&quot;</span>, LOCKFILE, strerror(errno));</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">/* 截断文件，防止之前的进程ID比当前进程ID长</span></span><br><span class="line"><span class="comment">     * 如之前的ID为12345，当前ID为9999，如果不截断，则文件留下的是99995</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    ftruncate(fd, <span class="number">0</span>);</span><br><span class="line">    <span class="comment">//向文件写入当前进程的ID</span></span><br><span class="line">    <span class="built_in">sprintf</span>(buf, <span class="string">&quot;%ld&quot;</span>, (<span class="keyword">long</span>)getpid());</span><br><span class="line">    write(fd, buf, <span class="built_in">strlen</span>(buf) + <span class="number">1</span>);</span><br><span class="line">    <span class="keyword">return</span> (<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2021/11/03/APUE-%E7%AC%AC13%E7%AB%A0-%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
         </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-APUE-第12章-线程控制" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
+    	 
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2021/09/13/APUE-%E7%AC%AC12%E7%AB%A0-%E7%BA%BF%E7%A8%8B%E6%8E%A7%E5%88%B6/">APUE-第12章-线程控制</a>
+      <a class="archive-article-title" href="/2021/11/03/APUE-%E7%AC%AC13%E7%AB%A0-%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B/">APUE-第13章-守护进程</a>
     </h1>
   
 
-        
-        <a href="/2021/09/13/APUE-%E7%AC%AC12%E7%AB%A0-%E7%BA%BF%E7%A8%8B%E6%8E%A7%E5%88%B6/" class="archive-article-date">
-  	<time datetime="2021-09-13T15:05:07.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2021-09-13</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="引言"><a href="#引言" class="headerlink" title="引言"></a>引言</h1><p>本章主要介绍线程属性、同步原语属性、同一进程中的多个线程之间如何保持数据私有性、进程如何与线程进行交互。</p>
-<h1 id="线程限制"><a href="#线程限制" class="headerlink" title="线程限制"></a>线程限制</h1><p>下面是线程相关的一些限制：</p>
-<table>
-<thead>
-<tr>
-<th>限制名称</th>
-<th>描述</th>
-<th>name参数</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>PTHREAD_DESTRUCTOR_ITERATIONS</td>
-<td>线程退出时尝试销毁线程特定数据的最大次数</td>
-<td>_SC_THREAD_DESTRUCTOR_ITERATIONS</td>
-</tr>
-<tr>
-<td>PTHREAD_KEYS_MAX</td>
-<td>进程可以创建的键的最大数目</td>
-<td>_SC_THREAD_KEYS_MAX</td>
-</tr>
-<tr>
-<td>PTHREAD_STACK_MIN</td>
-<td>一个线程栈可用的最小字节数</td>
-<td>_SC_THREAD_STACK_MIN</td>
-</tr>
-<tr>
-<td>PTHREAD_THREADS_MAX</td>
-<td>进程可以创建的最大线程数</td>
-<td>_SC_THREAD_THREADS_MAX</td>
-</tr>
-</tbody></table>
-<p>下面描述了4种操作系统实现中线程限制的值，其中“没有确定限制”并不意味着值是无限的：</p>
-<table>
-<thead>
-<tr>
-<th>限制名称</th>
-<th>FreeBSD 8.0</th>
-<th>Linux 3.2.0</th>
-<th>Mac OS X 10.6.8</th>
-<th>Solaris 10</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>PTHREAD_DESTRUCTOR_ITERATIONS</td>
-<td>4</td>
-<td>4</td>
-<td>4</td>
-<td>没有确定限制</td>
-</tr>
-<tr>
-<td>PTHREAD_KEYS_MAX</td>
-<td>256</td>
-<td>1024</td>
-<td>512</td>
-<td>没有确定限制</td>
-</tr>
-<tr>
-<td>PTHREAD_STACK_MIN</td>
-<td>2048</td>
-<td>16384</td>
-<td>8192</td>
-<td>8192</td>
-</tr>
-<tr>
-<td>PTHREAD_THREADS_MAX</td>
-<td>没有确定限制</td>
-<td>没有确定限制</td>
-<td>没有确定限制</td>
-<td>没有确定限制</td>
-</tr>
-</tbody></table>
-<h1 id="线程属性"><a href="#线程属性" class="headerlink" title="线程属性"></a>线程属性</h1><p>pthread接口允许我们通过关联的不同属性来细调线程和同步对象的行为。管理这些属性的行为有：</p>
-<ol>
-<li>每个对象与它自己类型的属性对象进行关联（比如线程与线程属性关联，互斥量和互斥量属性关联），一个属性对象可以代表多个属性；</li>
-<li>有一个初始化函数，把属性设置为默认值；</li>
-<li>有一个销毁属性对象函数，销毁初始化函数分配的资源；</li>
-<li>每个属性都有一个从属性对象中获取属性值的函数；</li>
-<li>每个属性都有一个设置属性值的函数，属性值作为参数按值传递。</li>
-</ol>
-<p>在pthread_create函数中，有一个参数是pthread_attr_t，它可以修改线程默认属性。可以使用pthread_attr_init初始化pthread_attr_t结构。在调用pthread_attr_init后，pthread_attr_t结构所包含的就是操作系统实现支持的所有线程属性的默认值。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_init</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_destroy</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
+        <div class="article-info info-on-right">
+          
+          
 
-<p>pthread_attr_init初始化的属性对象是动态分配的，所以需要pthread_attr_destroy来释放这些内存空间。</p>
-<p><strong>分离线程</strong>：如果在创建线程时就知道不需要了解线程的终止状态，就可以修改pthread_attr_t 结构中detachstate线程属性，让线程一开始就处于分离状态。detachstate具有两个合法值：PTHREAD_CREATE_DETACHED——以分离状态启动线程、PTHREAD_CREATE_JOINABLE——正常启动线程，应用程序可以获取线程的终止状态。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* 获取当前的 detachstate 线程属性 */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_getdetachstate</span><span class="params">(<span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                                <span class="keyword">int</span> *detachstate)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_setdetachstate</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr, <span class="keyword">int</span> *detachstate)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
-
-
-
-<p>线程栈，即为线程分配的栈。可以使用pthread_attr_getstack和pthread_attr_setstack对线程栈属性进行管理。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_getstack</span><span class="params">(<span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                          <span class="keyword">void</span> **<span class="keyword">restrict</span> stackaddr,</span></span></span><br><span class="line"><span class="params"><span class="function">                          <span class="keyword">size_t</span> *<span class="keyword">restrict</span> stacksize)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_setstack</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr,</span></span></span><br><span class="line"><span class="params"><span class="function">					      <span class="keyword">void</span> *stackaddr, <span class="keyword">size_t</span> stacksize)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
-
-<p>对于线程，虚地址空间的大小是固定的。但对于线程，同样大小的虚地址空间必须被所有的线程共享。如果使用许多线程，则这些线程栈累计大小就超过了可用的虚地址空间，就需要减少默认的线程栈大小。如果线程的函数分配了大量的自动变量，或调用函数设计很深的栈，则需要的栈比默认的大。</p>
-<p>如果线程栈的虚地址空间消耗完了，则需要使用malloc或mmap来为可替代栈跟配空间，并用pthread_attr_setstack函数来改变新建线程的栈位置。stackattr参数指向线程栈的最低可寻址地址，该地址与边界地址对齐。当然，stackattr不一定是站的开始地址，如果一个处理器栈从高地址向低地址增长，那么stackaddr是线程栈的结尾位置。</p>
-<p>应用程序可以通过pthread_attr_getstacksize和pthread_attr_setstacksize读取或设置线程属性stacksize。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_getstacksize</span><span class="params">(<span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                              <span class="keyword">size_t</span> *<span class="keyword">restrict</span> stacksize)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_setstacksize</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr, <span class="keyword">size_t</span> stacksize)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
-
-<p>其中，设置stacksize时其大小不能小于PTHREAD_STACK_MIN。</p>
-<p>线程属性guardsize控制线程末尾用以避免栈溢出的扩展内存大小，默认值由具体实现决定，一般为系统页大小。将guardsize设置为0，则不会提供警戒缓冲区。如果程序修改了线程属性stackaddr，则系统认为由我们自己管理栈，栈警戒缓冲区机制无效，等同于将guardsize设置为0。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_getguardsize</span><span class="params">(<span class="keyword">const</span> <span class="keyword">pthread_attr_t</span> *<span class="keyword">restrict</span> attr,</span></span></span><br><span class="line"><span class="params"><span class="function">                              <span class="keyword">size_t</span> *<span class="keyword">restrict</span> guardsize)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_attr_setguartdsize</span><span class="params">(<span class="keyword">pthread_attr_t</span> *attr, <span class="keyword">size_t</span> guardsize)</span></span>;</span><br><span class="line">								两个函数返回值：若成功，返回<span class="number">0</span>；否则，返回错误编号</span><br></pre></td></tr></table></figure>
-
-<p>如果guardsize被修改，操作系统可能把它取为页大小的整数倍。如果线程的栈指针溢出至警戒区域，应用程序就可能通过信号接收到出错信息。</p>
-        
-          <a class="article-more-a" href="/2021/09/13/APUE-%E7%AC%AC12%E7%AB%A0-%E7%BA%BF%E7%A8%8B%E6%8E%A7%E5%88%B6/#more">more >></a>
-        
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">线程</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">APUE</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="/categories/UNIX//" class="article-tag-list-link color5">UNIX</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2021/09/13/APUE-%E7%AC%AC12%E7%AB%A0-%E7%BA%BF%E7%A8%8B%E6%8E%A7%E5%88%B6/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
+        </div>
+        <div class="clearfix"></div>
+    </header>
   </div>
 </article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
   
-    <article id="post-Markdown中我遇到的问题" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
+  
+    </div></section>
+  
+
     
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/08/30/Markdown%E4%B8%AD%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98/">使用Markdown中我遇到的问题</a>
-    </h1>
-  
-
-        
-        <a href="/2021/08/30/Markdown%E4%B8%AD%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98/" class="archive-article-date">
-  	<time datetime="2021-08-30T15:14:08.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2021-08-30</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="如何编写折叠代码块"><a href="#如何编写折叠代码块" class="headerlink" title="如何编写折叠代码块"></a>如何编写折叠代码块</h1><p>&lt;details&gt;<br>    &lt;summary&gt;标题1&lt;/summary&gt;<br>&lt;pre&gt;&lt;code&gt;代码内容<br>&lt;/code&gt;&lt;/pre&gt;<br>&lt;/details&gt;</p>
-<p>效果如下：</p>
-<details>
-    <summary>&gt标题1</summary>
-<pre><code>代码内容
-</code></pre>
-</details>
-
-<p>这里会有一个问题，当编写C程序，C程序中的头文件&lt;&gt;无法显示。<br>&lt;details&gt;<br>    &lt;summary&gt;标题2&lt;/summary&gt;<br>&lt;pre&gt;&lt;code&gt;#include &lt;stdio.h&gt;<br>&lt;/code&gt;&lt;/pre&gt;<br>&lt;/details&gt;<br>问题的效果如下，可以看到&lt;&gt;中的内容消失：</p>
-<details>
-    <summary>&gt标题2</summary>
-<pre><code>#include <stdio.h>
-</code></pre>
-</details>
-
-<p>此时可以将代码块中的&lt;替换为&amp;lt、&gt;替换为&amp;gt，如下：<br>&lt;details&gt;<br>    &lt;summary&gt;&amp;gt标题3&lt;/summary&gt;<br>&lt;pre&gt;&lt;code&gt;#include &amp;ltstdio.h&amp;gt<br>&lt;/code&gt;&lt;/pre&gt;<br>&lt;/details&gt;</p>
-<p>效果如下：</p>
-<details>
-    <summary>&gt标题3</summary>
-<pre><code>#include &ltstdio.h&gt
-</code></pre>
-</details>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">Markdown</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2021/08/30/Markdown%E4%B8%AD%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-APUE-第11章-线程" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/08/29/APUE-%E7%AC%AC11%E7%AB%A0-%E7%BA%BF%E7%A8%8B/">APUE_第11章_线程</a>
-    </h1>
-  
-
-        
-        <a href="/2021/08/29/APUE-%E7%AC%AC11%E7%AB%A0-%E7%BA%BF%E7%A8%8B/" class="archive-article-date">
-  	<time datetime="2021-08-29T08:12:26.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2021-08-29</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="线程概念"><a href="#线程概念" class="headerlink" title="线程概念"></a>线程概念</h1><p>在程序设计时把进程设计成某个时刻，每个线程能够处理各自独立的任务。这有很多好处：</p>
-<ul>
-<li>为每种事件类型分配单独的处理线程，可以简化处理异步事件的代码；</li>
-<li>多个进程必须使用操作系统提供的复杂机制才能实现内存和文件描述符的共享，而多个线程自动地可以访问相同的存储地址空间和文件描述符；</li>
-<li>分解问题从而提高整个程序的吞吐量。若是单线程进程要完成多个任务，需要把任务串行化；若是进程控制多个线程，相互独立的任务处理可以交叉进行，只需为每个任务分配一个单独的线程；</li>
-<li>交叉程序同样可以通过多线程改善响应时间，多线程可以把程序中处理用户输入输出部分和其他部分分开</li>
-</ul>
-<p>即使运行在单处理上，程序也可以通过多线程进行简化。而且，即使多线程程序在串行化任务时阻塞，由于某些线程在阻塞时还有其他线程可以运行，所以多线程程序在单处理上运行还是可以改善响应时间和吞吐量的。</p>
-<p>每个线程都包含有表示执行环境所必须的信息，其中包括：线程ID、一组寄存器值、栈、调度优先级、策略、信号屏蔽字、errno变量（每个线程拥有属于自己的局部errno，以免一个线程干扰另一个线程）、线程私有数据。一个进程的所有信息对该进程的所有线程共享，包括可执行程序的代码、程序的全局内存、堆内存、栈、文件描述符。</p>
-<h1 id="线程标识"><a href="#线程标识" class="headerlink" title="线程标识"></a>线程标识</h1><p>每个线程都有各自的线程ID。进程ID是整个系统中唯一的，线程ID是它所属的进程下上文中才有意义。</p>
-<p>线程ID是pthread_t数据类型表示，所有可移植操作系统不能把它作为整数处理，pthread_equal函数是用于对两个线程ID进行比较。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;phtread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pthread_equal</span><span class="params">(<span class="keyword">pthread_t</span> tid1, <span class="keyword">pthread_t</span> tid2)</span></span>;</span><br><span class="line">								返回值：若相等，返回非<span class="number">0</span>数值；否则，返回<span class="number">0</span></span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>Linux3.2.0 使用无符号长整型（unsigned long int）表示pthread_t ；</p>
-<p>Solaris 10 使用无符号整型（unsigned int）表示pthread_t；</p>
-<p>FreeBSD 8.0和Mac OS X 10.6.8用一个指向pthread结构的指针表示pthread_t。</p>
-</blockquote>
-<p>线程可以通过pthread_self函数获取自身线程ID。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;pthread.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">pthread_t</span> <span class="title">pthread_self</span><span class="params">(<span class="keyword">void</span>)</span></span>;</span><br><span class="line">								返回值：调用线程的线程ID</span><br></pre></td></tr></table></figure>
-
-<p>当线程需要识别以线程ID为标识的数据结构时，pthread_self函数和pthread_equal可以一起使用。如：</p>
-<p>下图为<strong>主线程控制工作队列</strong>实例。可以看到，主线程可以将新作业放进工作队列中，另外3个线程组成的线程池从队列中移出作业，当然线程不能任意从队列顶端取出作业，而是<strong>由主线程控制作业分配</strong>，主线程会在每个待处理作业的结构中标志处理该作业的线程ID，<strong>每个工作线程</strong>只能<strong>移除有自己线程ID的作业</strong>。</p>
-<p><img src="/images/work_queue.PNG" alt="工作队列实例"></p>
-        
-          <a class="article-more-a" href="/2021/08/29/APUE-%E7%AC%AC11%E7%AB%A0-%E7%BA%BF%E7%A8%8B/#more">more >></a>
-        
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">线程</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">APUE</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="/categories/UNIX//" class="article-tag-list-link color5">UNIX</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2021/08/29/APUE-%E7%AC%AC11%E7%AB%A0-%E7%BA%BF%E7%A8%8B/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-  
 
 
           </div>
@@ -669,9 +217,9 @@
     <script>
 	var yiliaConfig = {
 		mathjax: false,
-		isHome: true,
+		isHome: false,
 		isPost: false,
-		isArchive: false,
+		isArchive: true,
 		isTag: false,
 		isCategory: false,
 		open_in_new: false,
