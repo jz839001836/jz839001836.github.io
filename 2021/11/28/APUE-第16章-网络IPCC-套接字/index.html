@@ -6,19 +6,20 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://example.com">
-  <title>使用Markdown中我遇到的问题 | 读书和分享</title>
+  <title>APUE-第16章-网络IPCC-套接字 | 读书和分享</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="如何编写折叠代码块&lt;details&gt;    &lt;summary&gt;标题1&lt;&#x2F;summary&gt;&lt;pre&gt;&lt;code&gt;代码内容&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;&lt;&#x2F;details&gt; 效果如下：      &amp;gt标题1 代码内容    这里会有一个问题，当编写C程序，C程序中的头文件&lt;&gt;无法显示。&lt;de">
+  <meta name="description" content="读书和分享">
 <meta property="og:type" content="article">
-<meta property="og:title" content="使用Markdown中我遇到的问题">
-<meta property="og:url" content="http://example.com/2021/08/30/Markdown%E4%B8%AD%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98/index.html">
+<meta property="og:title" content="APUE-第16章-网络IPCC-套接字">
+<meta property="og:url" content="http://example.com/2021/11/28/APUE-%E7%AC%AC16%E7%AB%A0-%E7%BD%91%E7%BB%9CIPCC-%E5%A5%97%E6%8E%A5%E5%AD%97/index.html">
 <meta property="og:site_name" content="读书和分享">
-<meta property="og:description" content="如何编写折叠代码块&lt;details&gt;    &lt;summary&gt;标题1&lt;&#x2F;summary&gt;&lt;pre&gt;&lt;code&gt;代码内容&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;&lt;&#x2F;details&gt; 效果如下：      &amp;gt标题1 代码内容    这里会有一个问题，当编写C程序，C程序中的头文件&lt;&gt;无法显示。&lt;de">
+<meta property="og:description" content="读书和分享">
 <meta property="og:locale">
-<meta property="article:published_time" content="2021-08-30T15:14:08.000Z">
-<meta property="article:modified_time" content="2021-08-30T15:35:16.399Z">
+<meta property="article:published_time" content="2021-11-28T14:31:30.000Z">
+<meta property="article:modified_time" content="2021-11-28T14:32:41.576Z">
 <meta property="article:author" content="AZheng">
-<meta property="article:tag" content="Markdown">
+<meta property="article:tag" content="APUE">
+<meta property="article:tag" content="UNIX">
 <meta name="twitter:card" content="summary">
   
     <link rel="alternative" href="/atom.xml" title="读书和分享" type="application/atom+xml">
@@ -155,49 +156,27 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            <article id="post-Markdown中我遇到的问题" class="article article-type-post " itemscope itemprop="blogPost">
+            <article id="post-APUE-第16章-网络IPCC-套接字" class="article article-type-post " itemscope itemprop="blogPost">
   <div class="article-inner">
     
       <header class="article-header">
         
   
     <h1 class="article-title" itemprop="name">
-      使用Markdown中我遇到的问题
+      APUE-第16章-网络IPCC-套接字
     </h1>
   
 
         
-        <a href="/2021/08/30/Markdown%E4%B8%AD%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98/" class="archive-article-date">
-  	<time datetime="2021-08-30T15:14:08.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2021-08-30</time>
+        <a href="/2021/11/28/APUE-%E7%AC%AC16%E7%AB%A0-%E7%BD%91%E7%BB%9CIPCC-%E5%A5%97%E6%8E%A5%E5%AD%97/" class="archive-article-date">
+  	<time datetime="2021-11-28T14:31:30.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2021-11-28</time>
 </a>
         
       </header>
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h1 id="如何编写折叠代码块"><a href="#如何编写折叠代码块" class="headerlink" title="如何编写折叠代码块"></a>如何编写折叠代码块</h1><p>&lt;details&gt;<br>    &lt;summary&gt;标题1&lt;/summary&gt;<br>&lt;pre&gt;&lt;code&gt;代码内容<br>&lt;/code&gt;&lt;/pre&gt;<br>&lt;/details&gt;</p>
-<p>效果如下：</p>
-<details>
-    <summary>&gt标题1</summary>
-<pre><code>代码内容
-</code></pre>
-</details>
-
-<p>这里会有一个问题，当编写C程序，C程序中的头文件&lt;&gt;无法显示。<br>&lt;details&gt;<br>    &lt;summary&gt;标题2&lt;/summary&gt;<br>&lt;pre&gt;&lt;code&gt;#include &lt;stdio.h&gt;<br>&lt;/code&gt;&lt;/pre&gt;<br>&lt;/details&gt;<br>问题的效果如下，可以看到&lt;&gt;中的内容消失：</p>
-<details>
-    <summary>&gt标题2</summary>
-<pre><code>#include <stdio.h>
-</code></pre>
-</details>
-
-<p>此时可以将代码块中的&lt;替换为&amp;lt、&gt;替换为&amp;gt，如下：<br>&lt;details&gt;<br>    &lt;summary&gt;&amp;gt标题3&lt;/summary&gt;<br>&lt;pre&gt;&lt;code&gt;#include &amp;ltstdio.h&amp;gt<br>&lt;/code&gt;&lt;/pre&gt;<br>&lt;/details&gt;</p>
-<p>效果如下：</p>
-<details>
-    <summary>&gt标题3</summary>
-<pre><code>#include &ltstdio.h&gt
-</code></pre>
-</details>
-
+        
       
 
       
@@ -231,7 +210,11 @@
 		<ul class="article-tag-list">
 			 
         		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">Markdown</a>
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">APUE</a>
+        		</li>
+      		 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">UNIX</a>
         		</li>
       		
 		</ul>
@@ -287,7 +270,7 @@
     <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
     <p>扫一扫，分享到微信</p>
     <div class="wx-qrcode">
-      <img src="//pan.baidu.com/share/qrcode?url=http://example.com/2021/08/30/Markdown%E4%B8%AD%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98/" alt="微信分享二维码">
+      <img src="//pan.baidu.com/share/qrcode?url=http://example.com/2021/11/28/APUE-%E7%AC%AC16%E7%AB%A0-%E7%BD%91%E7%BB%9CIPCC-%E5%A5%97%E6%8E%A5%E5%AD%97/" alt="微信分享二维码">
     </div>
 </div>
 
@@ -301,18 +284,9 @@
   
 <nav id="article-nav">
   
-    <a href="/2021/09/13/APUE-%E7%AC%AC12%E7%AB%A0-%E7%BA%BF%E7%A8%8B%E6%8E%A7%E5%88%B6/" id="article-nav-newer" class="article-nav-link-wrap">
-      <i class="icon-circle-left"></i>
-      <div class="article-nav-title">
-        
-          APUE-第12章-线程控制
-        
-      </div>
-    </a>
   
-  
-    <a href="/2021/08/29/APUE-%E7%AC%AC11%E7%AB%A0-%E7%BA%BF%E7%A8%8B/" id="article-nav-older" class="article-nav-link-wrap">
-      <div class="article-nav-title">APUE_第11章_线程</div>
+    <a href="/2021/11/19/APUE-%E7%AC%AC15%E7%AB%A0-%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1/" id="article-nav-older" class="article-nav-link-wrap">
+      <div class="article-nav-title">APUE-第15章-进程间通信</div>
       <i class="icon-circle-right"></i>
     </a>
   
@@ -331,6 +305,19 @@
             </div>
         </div>
         
+        
+        <div class="toc-container tooltip-left">
+            <i class="icon-font icon-category"></i>
+            <div class="tooltip tooltip-east">
+                <span class="tooltip-item">
+                </span>
+                <span class="tooltip-content">
+                    <div class="toc-article">
+                    目录，不存在的…
+                    </div>
+                </span>
+            </div>
+        </div>
         
     </div>
 </aside>
