@@ -2,15 +2,6 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
-    <loc>http://example.com/2021/11/28/APUE-%E7%AC%AC16%E7%AB%A0-%E7%BD%91%E7%BB%9CIPC-%E5%A5%97%E6%8E%A5%E5%AD%97/</loc>
-    
-    <lastmod>2021-12-12</lastmod>
-    
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  
-  <url>
     <loc>http://example.com/2021/11/19/APUE-%E7%AC%AC15%E7%AB%A0-%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1/</loc>
     
     <lastmod>2021-11-28</lastmod>
@@ -82,13 +73,6 @@
   
   <url>
     <loc>http://example.com/tags/APUE/</loc>
-    <lastmod>2022-03-26</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.2</priority>
-  </url>
-  
-  <url>
-    <loc>http://example.com/tags/UNIX/</loc>
     <lastmod>2022-03-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
