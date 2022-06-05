@@ -6,7 +6,7 @@
   <link href="http://example.com/atom.xml" rel="self"/>
   
   <link href="http://example.com/"/>
-  <updated>2021-12-12T07:58:04.000Z</updated>
+  <updated>2022-06-05T13:00:56.714Z</updated>
   <id>http://example.com/</id>
   
   <author>
@@ -15,6 +15,31 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>设计模式-Observer模式</title>
+    <link href="http://example.com/2022/06/05/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F-Observer%E6%A8%A1%E5%BC%8F/"/>
+    <id>http://example.com/2022/06/05/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F-Observer%E6%A8%A1%E5%BC%8F/</id>
+    <published>2022-06-05T12:38:42.000Z</published>
+    <updated>2022-06-05T13:00:56.714Z</updated>
+    
+    <content type="html"><![CDATA[<p>参考书籍：<br>《HeadFirst 设计模式》<br>《设计模式-可复用面向对象软件的基础》</p><p>本文主要介绍对象行为型模式——Observer（观察者）模式，介绍的内容基于HeadFirst设计模式这本书，由于这本书是通过java编写，学习C++的朋友可能有所疑惑，因此本文借助GoF将其例子通过C++进行改编。</p><h1 id="意图"><a href="#意图" class="headerlink" title="意图"></a>意图</h1><p>观察者模式定义了对象间一对多的依赖关系，当一个对象（本文称其为主题对象）的状态发生改变时，所有依赖它的对象（本文称其为观察者对象）都会得到通知并被自动更新。</p><p>可能描述有些抽象，请看下图：</p><p><img src="/./%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F-Observer%E6%A8%A1%E5%BC%8F/%E8%A7%82%E5%AF%9F%E8%80%85%E6%A8%A1%E5%BC%8F.png" alt="观察者模式主要行为"></p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;p&gt;参考书籍：&lt;br&gt;《HeadFirst 设计模式》&lt;br&gt;《设计模式-可复用面向对象软件的基础》&lt;/p&gt;
+&lt;p&gt;本文主要介绍对象行为型模式——Observer（观察者）模式，介绍的内容基于HeadFirst设计模式这本书，由于这本书是通过java编写，学习C++的朋友可能有</summary>
+      
+    
+    
+    
+    
+    <category term="设计模式" scheme="http://example.com/tags/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/"/>
+    
+    <category term="C++" scheme="http://example.com/tags/C/"/>
+    
+  </entry>
   
   <entry>
     <title>APUE-第16章-网络IPC-套接字</title>

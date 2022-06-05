@@ -1,3 +1,4 @@
+http://example.com/2022/06/05/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F-Observer%E6%A8%A1%E5%BC%8F/
 http://example.com/2021/11/28/APUE-%E7%AC%AC16%E7%AB%A0-%E7%BD%91%E7%BB%9CIPC-%E5%A5%97%E6%8E%A5%E5%AD%97/
 http://example.com/2021/11/19/APUE-%E7%AC%AC15%E7%AB%A0-%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1/
 http://example.com/2021/11/13/APUE-%E7%AC%AC14%E7%AB%A0-%E9%AB%98%E7%BA%A7IO/
@@ -8,6 +9,8 @@ http://example.com/2021/08/30/Markdown%E4%B8%AD%E6%88%91%E9%81%87%E5%88%B0%E7%9A
 http://example.com/
 http://example.com/tags/%E7%BA%BF%E7%A8%8B/
 http://example.com/tags/APUE/
-http://example.com/tags/UNIX/
 http://example.com/tags/Markdown/
+http://example.com/tags/UNIX/
+http://example.com/tags/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/
+http://example.com/tags/C/
 http://example.com/categories/UNIX/

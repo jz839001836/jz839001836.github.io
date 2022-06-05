@@ -2,6 +2,15 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>http://example.com/2022/06/05/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F-Observer%E6%A8%A1%E5%BC%8F/</loc>
+    
+    <lastmod>2022-06-05</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
     <loc>http://example.com/2021/11/28/APUE-%E7%AC%AC16%E7%AB%A0-%E7%BD%91%E7%BB%9CIPC-%E5%A5%97%E6%8E%A5%E5%AD%97/</loc>
     
     <lastmod>2021-12-12</lastmod>
@@ -67,7 +76,7 @@
 
   <url>
     <loc>http://example.com/</loc>
-    <lastmod>2022-03-26</lastmod>
+    <lastmod>2022-06-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
@@ -75,28 +84,42 @@
   
   <url>
     <loc>http://example.com/tags/%E7%BA%BF%E7%A8%8B/</loc>
-    <lastmod>2022-03-26</lastmod>
+    <lastmod>2022-06-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
   
   <url>
     <loc>http://example.com/tags/APUE/</loc>
-    <lastmod>2022-03-26</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.2</priority>
-  </url>
-  
-  <url>
-    <loc>http://example.com/tags/UNIX/</loc>
-    <lastmod>2022-03-26</lastmod>
+    <lastmod>2022-06-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
   
   <url>
     <loc>http://example.com/tags/Markdown/</loc>
-    <lastmod>2022-03-26</lastmod>
+    <lastmod>2022-06-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  
+  <url>
+    <loc>http://example.com/tags/UNIX/</loc>
+    <lastmod>2022-06-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  
+  <url>
+    <loc>http://example.com/tags/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/</loc>
+    <lastmod>2022-06-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  
+  <url>
+    <loc>http://example.com/tags/C/</loc>
+    <lastmod>2022-06-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
@@ -105,7 +128,7 @@
   
   <url>
     <loc>http://example.com/categories/UNIX/</loc>
-    <lastmod>2022-03-26</lastmod>
+    <lastmod>2022-06-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
